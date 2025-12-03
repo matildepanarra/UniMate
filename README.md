@@ -1,6 +1,7 @@
-# UniMate - AI- powered Financial Assistant for Students 
+# UniMate: AI-powered Financial Assistant for Students 
 
-BRIEF DESCRIPTION OF APPLICATION
+AI-driven assistant that helps students quickly find and apply for financial aid by analyzing their information and documents.
+
 
 ## Overview
 
