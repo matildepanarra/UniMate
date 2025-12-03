@@ -2,7 +2,6 @@
 AI Service - All Gemini API interactions
 Handles structured extraction, chat, and AI-powered analysis.
 """
-
 import os
 import json
 from google import genai
