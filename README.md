@@ -107,11 +107,11 @@ cp .env.example .env
 
 **Required environment variables:**
 ```
-GOOGLE_API_KEY=your_gemini_api_key_here
-LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
-LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+GOOGLE_API_KEY=AIzaSyDHoic4Vf9hyIOZucYugVAkMZDjYqr7aUk
+LANGFUSE_PUBLIC_KEY=pk-lf-2d35a3b0-7ab0-43bd-bb21-4ce72fb52316
+LANGFUSE_SECRET_KEY=sk-lf-d28bb517-23f0-464e-b55e-8fa6711d1fbb
 LANGFUSE_HOST=https://cloud.langfuse.com
-# Add other required API keys
+
 ```
 
 4. Run the application:
