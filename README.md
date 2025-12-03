@@ -1,6 +1,7 @@
-# UniMate - AI- powered Financial Assistant for Students 
+# UniMate: AI-powered Financial Assistant for Students 
 
-BRIEF DESCRIPTION OF APPLICATION
+AI-driven assistant that helps students quickly find and apply for financial aid by analyzing their information and documents.
+
 
 ## Overview
 
@@ -29,7 +30,7 @@ UniMate is a comprehensive financial management application designed specificall
 - Structured output parsing for expense extraction
 - Prompt engineering for personalized financial advice 
 
-##Architecture
+## Architecture
 
 
 UniMate follows a clean architecture pattern with clear separation of concerns across four main layers:
@@ -107,11 +108,11 @@ cp .env.example .env
 
 **Required environment variables:**
 ```
-GOOGLE_API_KEY=your_gemini_api_key_here
-LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
-LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+GOOGLE_API_KEY=AIzaSyDHoic4Vf9hyIOZucYugVAkMZDjYqr7aUk
+LANGFUSE_PUBLIC_KEY=pk-lf-2d35a3b0-7ab0-43bd-bb21-4ce72fb52316
+LANGFUSE_SECRET_KEY=sk-lf-d28bb517-23f0-464e-b55e-8fa6711d1fbb
 LANGFUSE_HOST=https://cloud.langfuse.com
-# Add other required API keys
+
 ```
 
 4. Run the application:
@@ -233,8 +234,6 @@ project-root/
 └── README.md             # This file
 ```
 
-**Note:** Component-level READMEs (e.g., `services/README.md`, `tools/README.md`) are recommended if those components need detailed explanation.
-
 ## Team
 
 - Matilde Panarra - Full-Stack Development & AI Integration
@@ -248,10 +247,6 @@ project-root/
   - Implemented analytics engine and insights generation
   - Integrated Langfuse observability and monitoring
   - Managed database design and deployment
-
-## License
-
-[Your chosen license - MIT, Apache, etc. - not necessary]
 
 ---
 
