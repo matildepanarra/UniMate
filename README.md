@@ -30,7 +30,7 @@ UniMate is a comprehensive financial management application designed specificall
 - Structured output parsing for expense extraction
 - Prompt engineering for personalized financial advice 
 
-##Architecture
+## Architecture
 
 
 UniMate follows a clean architecture pattern with clear separation of concerns across four main layers:
@@ -234,8 +234,6 @@ project-root/
 └── README.md             # This file
 ```
 
-**Note:** Component-level READMEs (e.g., `services/README.md`, `tools/README.md`) are recommended if those components need detailed explanation.
-
 ## Team
 
 - Matilde Panarra - Full-Stack Development & AI Integration
@@ -249,10 +247,6 @@ project-root/
   - Implemented analytics engine and insights generation
   - Integrated Langfuse observability and monitoring
   - Managed database design and deployment
-
-## License
-
-[Your chosen license - MIT, Apache, etc. - not necessary]
 
 ---
 
