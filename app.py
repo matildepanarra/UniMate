@@ -4,14 +4,14 @@ A Streamlit app .......
 """
 
 import streamlit as st
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 
 #Import services
 from services import expense_service, budget_service, analytics_service
-from tools.ai_assistant import chat_with_ai
+#from tools.ai_assistant import chat_with_ai
 
 # Load environment variables
-load_dotenv()
+#load_dotenv()
 
 
 st.set_page_config(
@@ -35,7 +35,7 @@ def page_expenses():
     if st.button("Save Expense"):
         expense_service.add_expense(category, amount, note)
         st.success("Expense saved!")
-
+#
     st.subheader("Your Expenses")
     expenses = expense_service.get_expenses()
     st.table(expenses)
@@ -58,18 +58,18 @@ def page_analytics():
     st.write("Spending Trends")
     chart = analytics_service.get_spending_chart()
     st.line_chart(chart)
-
+#
 def page_ai_assistant():
     st.title("🤖 AI Financial Assistant")
 
     user_input = st.text_input("Ask UniMate anything about your finances:")
 
-    if st.button("Ask"):
-        if user_input.strip():
-            answer = chat_with_ai(user_input)
-            st.success(answer)
-        else:
-            st.warning("Please enter a question.")
+#  if st.button("Ask"):
+#        if user_input.strip():
+#            answer = chat_with_ai(user_input)
+#            st.success(answer)
+#        else:
+#            st.warning("Please enter a question.")
 
 # -------------------------
 # Sidebar Navigation
