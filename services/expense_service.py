@@ -5,7 +5,7 @@ Orquestra chamadas ao AIService para extração e categorização.
 from typing import List, Dict, Optional
 from datetime import datetime
 import sqlite3
-import db_connector 
+from services import db_connector 
 from services.ai_service import AIService 
 
 # 1. MODELO DE DADOS DE DESPESA 
@@ -57,6 +57,8 @@ class ExpenseService:
         INSERT INTO expenses (user_id, amount, category, vendor, transaction_date, notes, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
+        if amount <= 0:
+            raise ValueError("Amount must be greater than 0.")
         
         # O campo 'vendor' no DB corresponde à 'description' na nossa lógica
         new_expense = Expense(
@@ -71,7 +73,7 @@ class ExpenseService:
         conn = None
         try:
             # Reutiliza a função de conexão do seu módulo
-            conn = db_connector.create_connection(self.db_file) 
+            conn = db_connector.get_connection(self.db_file)
             cursor = conn.cursor()
             cursor.execute(sql, new_expense.to_tuple())
             conn.commit()

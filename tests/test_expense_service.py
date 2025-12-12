@@ -1,29 +1,31 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from services.expense_service import ExpenseService # Assumimos que o ExpenseService está no services/
-from datetime import datetime
+import os
+os.environ["GOOGLE_API_KEY"] = "kkhshdhfbfkkcdnek"
+from services.expense_service import ExpenseService
 
-# Simulação do caminho para o ficheiro de base de dados para testes
-TEST_DB_FILE = ":memory:" # Usamos uma DB SQLite em memória RAM para testes rápidos
+TEST_DB_FILE = ":memory:"
 
 class TestExpenseService(unittest.TestCase):
 
     def setUp(self):
-        """Prepara o ambiente antes de cada teste."""
-        # Inicializamos o serviço com o DB em memória (o DB real não é usado)
         self.expense_service = ExpenseService(db_file=TEST_DB_FILE)
-        
-        # O ExpenseService requer que o AIService esteja funcional, 
-        # mas vamos mockar (simular) o AIService para não fazermos chamadas reais à API.
 
+    @patch('services.expense_service.db_connector.get_connection')
     @patch('services.expense_service.ExpenseService.get_expense')
-    @patch('tools.add_expense.insert_new_expense')
-    
-    def test_add_and_get_expense_manual(self, mock_add, mock_get_method):
-    # --- Mock do ADD ---
-        mock_add.return_value = 1
+    def test_add_and_get_expense_manual(self, mock_get_method, mock_get_connection):
 
-    # 1) Chamar add_expense
+        # 1) Criar um "conn fake"
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get_connection.return_value = mock_conn
+
+        # 2) Simular que depois do INSERT o id é 1
+        mock_cursor.lastrowid = 1
+
+        # 3) Chamar add_expense (vai usar conn e cursor fake)
         expense_id = self.expense_service.add_expense(
             user_id=1,
             amount=50.50,
@@ -31,11 +33,9 @@ class TestExpenseService(unittest.TestCase):
             date_str="2025-12-01",
             category="Restaurante"
         )
-    # 2) Verificar o resultado do add
         self.assertEqual(expense_id, 1)
-        mock_add.assert_called_once()
 
-    # --- Mock do GET ---
+        # 4) Agora mock do GET
         mock_get_method.return_value = {
             "id": 1,
             "user_id": 1,
@@ -43,70 +43,51 @@ class TestExpenseService(unittest.TestCase):
             "vendor": "Café",
             "category": "Restaurante"
         }
-    # 3) Chamar get_expense
-    retrieved_expense = self.expense_service.get_expense(1)
 
-    # 4) Verificações do get
-    mock_get_method.assert_called_once_with(1)
-    self.assertEqual(retrieved_expense["amount"], 50.50)
+        retrieved = self.expense_service.get_expense(1)
+        self.assertEqual(retrieved["amount"], 50.50)
 
 
     @patch('services.ai_service.AIService.extract_document_data')
     @patch('services.ai_service.AIService.classify_expense')
     @patch('services.expense_service.ExpenseService.add_expense')
     def test_add_expense_from_document_success(self, mock_add_expense, mock_classify, mock_extract):
-        """
-        Testa a TOOL: add_expense_from_document. 
-        Testamos a ORQUESTRAÇÃO entre o AIService e o ExpenseService.
-        """
-        # --- Configurar Mocks da IA ---
         mock_extract.return_value = {
-            "amount": 120.75, 
-            "description": "Amazon.com", 
+            "amount": 120.75,
+            "description": "Amazon.com",
             "date": "2025-12-11"
         }
         mock_classify.return_value = "Outros"
-        
-        # --- Configurar Mock do ADD (para finalizar o ciclo) ---
-        mock_add_expense.return_value = 10 
-        
-        # 1. Chamar o Orquestrador
+        mock_add_expense.return_value = 10
+
         expense_id = self.expense_service.add_expense_from_document(
-            user_id=2, 
+            user_id=2,
             document_text="Cobrança 120.75 Amazon ontem"
         )
-        
-        # 2. Assert de Orquestração
-        # Verificamos se a IA foi chamada para extração
+
         mock_extract.assert_called_once()
-        # Verificamos se a IA foi chamada para categorização com o resultado extraído
         mock_classify.assert_called_once_with(
-            amount=120.75, 
-            description="Amazon.com", 
+            amount=120.75,
+            description="Amazon.com",
             categories_list=self.expense_service.valid_categories
         )
-        # Verificamos se o método final de adição foi chamado com os dados limpos
+
+        # aceitar positional (porque o teu código chama assim)
         mock_add_expense.assert_called_once_with(2, 120.75, "Amazon.com", "2025-12-11", "Outros")
         self.assertEqual(expense_id, 10)
 
     def test_add_expense_manual_validation_fail(self):
-        """
-        Testa a lógica de validação: Montante negativo deve falhar.
-        """
-        # Usamos patch no tool de DB para garantir que ele não é chamado.
         with patch('tools.add_expense.insert_new_expense') as mock_add:
-            # Esperamos que o método levante um ValueError
             with self.assertRaises(ValueError):
                 self.expense_service.add_expense(
-                    user_id=1, 
-                    amount=-10.00, # Valor Inválido
-                    description="Teste", 
-                    date_str="2025-12-01", 
+                    user_id=1,
+                    amount=-10.00,
+                    description="Teste",
+                    date_str="2025-12-01",
                     category="Outros"
                 )
-            # Verificamos se o tool de DB NUNCA foi chamado
             mock_add.assert_not_called()
 
 
 if __name__ == '__main__':
-    unittest.main(argv=['first-arg-is-ignored'], exit=False)
+    unittest.main()

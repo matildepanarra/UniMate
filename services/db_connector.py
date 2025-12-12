@@ -2,12 +2,13 @@
 
 import sqlite3 # The actual library for the database
 
-DATABASE_NAME = "unimate.db"
+DATABASE_NAME = "unimate_financial_data.db"
 
-def get_connection():
-    """Returns a new connection object to the database."""
-    conn = sqlite3.connect(DATABASE_NAME)
-    # Configure the connection (e.g., set row factory for dictionary-style results)
+def get_connection(db_file: str):
+    """
+    Returns a new connection object to the database.
+    """
+    conn = sqlite3.connect(db_file)
     return conn
 
 # Or a class for more complex projects (Singleton Pattern is common here)
