@@ -1,0 +1,24 @@
+"""
+tools/analytics/get_category_breakdown.py - Agrega gastos por categoria.
+"""
+import sqlite3
+import db_connector
+from typing import List, Dict
+
+def get_category_spending_breakdown(db_file: str, user_id: int) -> List[Dict]:
+    """
+    TOOL: get_category_breakdown. Calcula o gasto total por categoria.
+    O Service calcula a percentagem.
+    """
+    sql = """
+    SELECT 
+        category,
+        SUM(amount) AS total_spent
+    FROM expenses
+    WHERE user_id = ?
+    GROUP BY category
+    ORDER BY total_spent DESC
+    """
+    return db_connector.execute_select_query(db_file, sql, (user_id,)) # Assume-se uma função utilitária de SELECT
+
+# Nota: Se não tiver a função execute_select_query no db_connector, use o _execute_query do AnalyticsService
