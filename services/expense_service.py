@@ -8,6 +8,7 @@ import sqlite3
 # Assumimos que o seu módulo de base de dados está disponível como 'db_connector'
 # Caso o seu arquivo se chame 'database_setup.py', substitua 'db_connector'
 import db_connector 
+from services import *
 from ai_service import AIService 
 
 # --- 1. MODELO DE DADOS DE DESPESA (Mantido, mas ajustado para DB) ---
