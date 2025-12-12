@@ -139,4 +139,8 @@ class ExpenseService:
             categories_list=self.valid_categories
         )
         final_category = category_result.split('\n')[0].strip()
-        if final_category not in self.valid
+        if final_category not in self.valid_categories:
+            final_category = "Outros"   
+        # 3. Adição da Despesa (Persistência no DB)
+        print(f"Salvando despesa: {description} ({amount}) -> Categoria: {final_category}")
+        return self.add_expense(user_id, amount, description, date_str, final_category)
