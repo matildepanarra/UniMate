@@ -16,8 +16,8 @@ class TestExpenseService(unittest.TestCase):
         # O ExpenseService requer que o AIService esteja funcional, 
         # mas vamos mockar (simular) o AIService para não fazermos chamadas reais à API.
 
-    @patch('tools.expense.add_expense.insert_new_expense')
-    @patch('tools.expense.get_expense.select_expense_by_id')
+    @patch('services.expense_service.select_expense_by_id')
+    @patch('services.expense_service.insert_new_expense')
     def test_add_and_get_expense_manual(self, mock_get, mock_add):
         """
         Testa a TOOL: add_expense e get_expense.
