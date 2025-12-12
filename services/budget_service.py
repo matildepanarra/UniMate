@@ -7,7 +7,9 @@ from datetime import datetime
 import sqlite3
 # Assumimos que o seu módulo de base de dados é 'db_connector'
 from services import db_connector 
-from ai_service import AIService 
+from services.ai_service import AIService 
+from typing import Optional, Tuple
+import json
 
 # --- SERVIÇO DE ORÇAMENTO ---
 class BudgetService:
@@ -41,7 +43,7 @@ class BudgetService:
         
         conn = None
         try:
-            conn = db_connector.create_connection(self.db_file)
+            conn = db_connector.get_connection(self.db_file)
             cursor = conn.cursor()
             
             # Tenta atualizar primeiro (se já existir para a categoria neste mês)
@@ -94,7 +96,7 @@ class BudgetService:
         conn = None
         status_report = []
         try:
-            conn = db_connector.create_connection(self.db_file)
+            conn = db_connector.get_connection(self.db_file)
             cursor = conn.cursor()
             cursor.execute(sql, (user_id,))
             
@@ -132,7 +134,7 @@ class BudgetService:
         conn = None
         historical_data = []
         try:
-            conn = db_connector.create_connection(self.db_file)
+            conn = db_connector.get_connection(self.db_file)
             sql_expenses = "SELECT transaction_date, amount FROM expenses WHERE user_id = ? ORDER BY transaction_date DESC LIMIT 100"
             cursor = conn.cursor()
             cursor.execute(sql_expenses, (user_id,))
