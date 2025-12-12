@@ -3,8 +3,9 @@ analytics_service.py - Fornece relatórios e insights de dados agregados usando 
 """
 from typing import List, Dict
 import sqlite3
-import services import db_connector
+from services import db_connector
 from datetime import datetime
+from typing import Optional, Tuple
 
 class AnalyticsService:
     def __init__(self, db_file: str):
@@ -16,7 +17,7 @@ class AnalyticsService:
         """Função utilitária para executar consultas SELECT e retornar resultados como lista de dicionários."""
         conn = None
         try:
-            conn = db_connector.create_connection(self.db_file)
+            conn = db_connector.get_connection(self.db_file)
             cursor = conn.cursor()
             cursor.execute(sql, params or ())
             return [dict(row) for row in cursor.fetchall()]
