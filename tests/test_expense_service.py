@@ -16,44 +16,39 @@ class TestExpenseService(unittest.TestCase):
         # O ExpenseService requer que o AIService esteja funcional, 
         # mas vamos mockar (simular) o AIService para não fazermos chamadas reais à API.
 
-    @patch('services.expense_service.select_expense_by_id')
-    @patch('services.expense_service.insert_new_expense')
-    def test_add_and_get_expense_manual(self, mock_get, mock_add):
-        """
-        Testa a TOOL: add_expense e get_expense.
-        Testamos se o serviço chama o tool de DB corretamente.
-        """
-        # --- Configurar o Mock do ADD ---
-        # Simulamos que o tool de DB retorna o ID 1 após a inserção
-        mock_add.return_value = 1 
-        
-        # 1. Chamar o método do Serviço (a lógica de negócio)
+    @patch('services.expense_service.ExpenseService.get_expense')
+    @patch('tools.add_expense.insert_new_expense')
+    
+    def test_add_and_get_expense_manual(self, mock_add, mock_get_method):
+    # --- Mock do ADD ---
+        mock_add.return_value = 1
+
+    # 1) Chamar add_expense
         expense_id = self.expense_service.add_expense(
-            user_id=1, 
-            amount=50.50, 
-            description="Café", 
-            date_str="2025-12-01", 
+            user_id=1,
+            amount=50.50,
+            description="Café",
+            date_str="2025-12-01",
             category="Restaurante"
         )
-        
-        # 2. Assert (Verificação)
-        # Verificamos se o serviço chamou o tool de DB exatamente uma vez
-        mock_add.assert_called_once()
-        # Verificamos se o serviço retornou o ID que o mock simulou
+    # 2) Verificar o resultado do add
         self.assertEqual(expense_id, 1)
+        mock_add.assert_called_once()
 
-        # --- Configurar o Mock do GET ---
-        # Simulamos que o tool de DB retorna uma linha (o dicionário)
-        mock_get.return_value = {
-            "id": 1, "user_id": 1, "amount": 50.50, "vendor": "Café", "category": "Restaurante"
+    # --- Mock do GET ---
+        mock_get_method.return_value = {
+            "id": 1,
+            "user_id": 1,
+            "amount": 50.50,
+            "vendor": "Café",
+            "category": "Restaurante"
         }
-        
-        # 3. Chamar o método do Serviço (get_expense)
-        retrieved_expense = self.expense_service.get_expense(1)
-        
-        # 4. Assert (Verificação)
-        mock_get.assert_called_once_with(TEST_DB_FILE, 1) # Verifica se a chamada foi com os args corretos
-        self.assertEqual(retrieved_expense['amount'], 50.50)
+    # 3) Chamar get_expense
+    retrieved_expense = self.expense_service.get_expense(1)
+
+    # 4) Verificações do get
+    mock_get_method.assert_called_once_with(1)
+    self.assertEqual(retrieved_expense["amount"], 50.50)
 
 
     @patch('services.ai_service.AIService.extract_document_data')
@@ -91,13 +86,7 @@ class TestExpenseService(unittest.TestCase):
             categories_list=self.expense_service.valid_categories
         )
         # Verificamos se o método final de adição foi chamado com os dados limpos
-        mock_add_expense.assert_called_once_with(
-            user_id=2, 
-            amount=120.75, 
-            description="Amazon.com", 
-            date_str="2025-12-11", 
-            category="Outros"
-        )
+        mock_add_expense.assert_called_once_with(2, 120.75, "Amazon.com", "2025-12-11", "Outros")
         self.assertEqual(expense_id, 10)
 
     def test_add_expense_manual_validation_fail(self):
@@ -105,7 +94,7 @@ class TestExpenseService(unittest.TestCase):
         Testa a lógica de validação: Montante negativo deve falhar.
         """
         # Usamos patch no tool de DB para garantir que ele não é chamado.
-        with patch('tools.expense.add_expense.insert_new_expense') as mock_add:
+        with patch('tools.add_expense.insert_new_expense') as mock_add:
             # Esperamos que o método levante um ValueError
             with self.assertRaises(ValueError):
                 self.expense_service.add_expense(

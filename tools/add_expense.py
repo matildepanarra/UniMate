@@ -1,6 +1,7 @@
 # Lógica Pura: SÓ se preocupa com o BANCO DE DADOS
 import sqlite3
-import db_connector
+import services.db_connector as db_connector
+from typing import Optional
 
 def insert_new_expense(db_file: str, user_id: int, amount: float, category: str, vendor: str, transaction_date: str) -> Optional[int]:
     # 1. Montar a QUERY SQL
