@@ -3,7 +3,7 @@ analytics_service.py - Fornece relatórios e insights de dados agregados usando 
 """
 from typing import List, Dict
 import sqlite3
-import db_connector
+import services import db_connector
 from datetime import datetime
 
 class AnalyticsService:

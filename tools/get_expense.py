@@ -2,7 +2,7 @@
 tools/expense/get_expense.py - Busca uma despesa na tabela 'expenses'.
 """
 import sqlite3
-import db_connector
+from services import db_connector
 from typing import Optional, Dict
 
 def select_expense_by_id(db_file: str, expense_id: int) -> Optional[Dict]:

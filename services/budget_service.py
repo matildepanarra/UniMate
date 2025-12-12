@@ -6,7 +6,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import sqlite3
 # Assumimos que o seu módulo de base de dados é 'db_connector'
-import db_connector 
+from services import db_connector 
 from ai_service import AIService 
 
 # --- SERVIÇO DE ORÇAMENTO ---

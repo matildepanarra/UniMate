@@ -2,7 +2,7 @@
 tools/budget/budget_calculator.py - Calcula o status de orçamento (limite vs. gasto).
 """
 import sqlite3
-import db_connector
+from services import db_connector
 from typing import List, Dict
 
 def calculate_budget_status(db_file: str, user_id: int, start_date: str, end_date: str) -> List[Dict]:

@@ -2,7 +2,7 @@
 tools/analytics/summarize_expense.py - Fornece resumo estatístico.
 """
 import sqlite3
-import db_connector
+from services import db_connector
 from typing import Dict
 
 def get_expense_summary(db_file: str, user_id: int) -> Dict:

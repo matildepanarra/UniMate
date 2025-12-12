@@ -2,7 +2,7 @@
 tools/budget/set_budget.py - Define/Atualiza o limite de orçamento.
 """
 import sqlite3
-import db_connector
+from services import db_connector
 from typing import Optional
 
 def upsert_budget_limit(db_file: str, user_id: int, category: str, amount_limit: float, 

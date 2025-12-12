@@ -2,7 +2,7 @@
 tools/analytics/detect_anomalies.py - Identifica gastos anómalos.
 """
 import sqlite3
-import db_connector
+from services import db_connector
 from typing import List, Dict
 
 def find_spending_anomalies(db_file: str, user_id: int) -> List[Dict]:

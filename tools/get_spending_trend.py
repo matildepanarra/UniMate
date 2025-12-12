@@ -2,7 +2,7 @@
 tools/analytics/get_spending_trends.py - Calcula o gasto agregado mensal.
 """
 import sqlite3
-import db_connector
+from services import db_connector
 from typing import List, Dict
 
 def get_spending_trends_data(db_file: str, user_id: int) -> List[Dict]:
