@@ -5,6 +5,7 @@ Orquestra chamadas ao AIService para extração e categorização.
 from typing import List, Dict, Optional
 from datetime import datetime
 import sqlite3
+from langfuse import observe
 from services import db_connector 
 from services.ai_service import AIService 
 
@@ -23,6 +24,7 @@ class Expense:
         self.notes = notes
         self.created_at = datetime.now().isoformat()
 
+    @observe()
     def to_tuple(self):
         # Usado para INSERT na tabela expenses
         return (
@@ -49,6 +51,7 @@ class ExpenseService:
     # ----------------------------------------------------
     # TOOL: add_expense (Persistência no DB)
     # ----------------------------------------------------
+    @observe()
     def add_expense(self, user_id: int, amount: float, description: str, date_str: str, category: str) -> Optional[int]:
         """
         Insere uma nova despesa na tabela 'expenses'.
@@ -88,6 +91,7 @@ class ExpenseService:
     # ----------------------------------------------------
     # TOOL: get_expense (Consulta no DB)
     # ----------------------------------------------------
+    @observe()
     def get_expense(self, expense_id: int) -> Optional[Dict]:
         """
         Busca uma despesa específica pelo ID.
@@ -117,6 +121,7 @@ class ExpenseService:
     # A lógica aqui permanece a mesma, pois as chamadas para a IA e a adição final
     # (self.add_expense) já foram tratadas.
 
+    @observe()
     def add_expense_from_document(self, user_id: int, document_text: str) -> Optional[int]:
         """
         Processa texto de um documento/notificação para extrair, classificar e salvar uma despesa.
