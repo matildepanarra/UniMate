@@ -5,6 +5,11 @@ com AI-driven data capture e Langfuse observability.
 """
 import streamlit as st
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+import os
+
+
 
 DB_FILE = "unimate_financial_data.db"
 USER_ID = 1  # Simulação de um único usuário para este exemplo
@@ -87,7 +92,6 @@ with tab3:
 with tab4:
     st.header("AI Chat Assistant")
     
-
 
 
 # Footer
