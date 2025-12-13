@@ -19,6 +19,7 @@ class AnalyticsService:
         conn = None
         try:
             conn = db_connector.get_connection(self.db_file)
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(sql, params or ())
             return [dict(row) for row in cursor.fetchall()]
