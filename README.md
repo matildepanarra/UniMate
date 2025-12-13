@@ -108,9 +108,9 @@ cp .env.example .env
 
 **Required environment variables:**
 ```
-GOOGLE_API_KEY=AIzaSyDHoic4Vf9hyIOZucYugVAkMZDjYqr7aUk
-LANGFUSE_PUBLIC_KEY=pk-lf-2d35a3b0-7ab0-43bd-bb21-4ce72fb52316
-LANGFUSE_SECRET_KEY=sk-lf-d28bb517-23f0-464e-b55e-8fa6711d1fbb
+GOOGLE_API_KEY=
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_SECRET_KEY=
 LANGFUSE_HOST=https://cloud.langfuse.com
 
 ```
