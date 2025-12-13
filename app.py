@@ -62,13 +62,8 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader("SLA Response Times")
-    st.markdown("""
-    - **Critical:** 4 hours
-    - **High:** 24 hours
-    - **Medium:** 48 hours
-    - **Low:** 72 hours
-    """)
+    st.subheader("Um titulo")
+    
 
 # Main content area
 tab1, tab2, tab3, tab4 = st.tabs(["💰 Expenses", "📊 Budgets", "📈 Analytics", "🤖 AI Assistant"])
