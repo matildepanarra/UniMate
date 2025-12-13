@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import pandas as pd
 from datetime import datetime
 import numpy
-import ospip install --upgrade numpy
+import os
 import json
 # O google.genai não é necessário aqui, pois os clientes são instanciados nos serviços.
 
