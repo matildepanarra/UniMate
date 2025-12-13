@@ -5,7 +5,7 @@ Depende do ExpenseService para dados de gastos.
 from typing import List, Dict, Optional
 from datetime import datetime
 import sqlite3
-# Assumimos que o seu módulo de base de dados é 'db_connector'
+from langfuse import observe
 from services import db_connector 
 from services.ai_service import AIService 
 from typing import Optional, Tuple
@@ -18,7 +18,7 @@ class BudgetService:
         self.ai_client = AIService()
 
     # --- Funções Auxiliares de DB ---
-
+    @observe()
     def _get_current_month_dates(self) -> Tuple[str, str]:
         """Retorna o primeiro e o último dia do mês atual (YYYY-MM-DD)."""
         now = datetime.now()
@@ -34,6 +34,7 @@ class BudgetService:
     # ----------------------------------------------------
     # TOOL: set_budget (Persistência no DB)
     # ----------------------------------------------------
+    @observe()
     def set_budget(self, user_id: int, category: str, amount_limit: float) -> Optional[int]:
         """
         Define ou atualiza um limite de orçamento (assumido ser mensal) na tabela 'budgets'.
@@ -74,6 +75,7 @@ class BudgetService:
     # ----------------------------------------------------
     # TOOL: budget_calculator -> get_budget_status (Consulta no DB)
     # ----------------------------------------------------
+    @observe()
     def get_budget_status(self, user_id: int) -> List[Dict]:
         """
         Calcula o status atual de todos os orçamentos (Limite vs. Gasto Real).
@@ -123,6 +125,7 @@ class BudgetService:
     # ----------------------------------------------------
     # TOOL: budget_calculator -> analyze_budget (Análise de IA)
     # ----------------------------------------------------
+    @observe()
     def analyze_budget(self, user_id: int) -> Dict:
         """
         Orquestra a análise do orçamento, obtendo dados e chamando a previsão da IA.

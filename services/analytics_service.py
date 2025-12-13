@@ -5,6 +5,7 @@ from typing import List, Dict
 import sqlite3
 from services import db_connector
 from datetime import datetime
+from langfuse import observe
 from typing import Optional, Tuple
 
 class AnalyticsService:
@@ -12,7 +13,7 @@ class AnalyticsService:
         self.db_file = db_file
 
     # --- Funções Auxiliares de DB ---
-
+    @observe()
     def _execute_query(self, sql: str, params: Optional[Tuple] = None) -> List[Dict]:
         """Função utilitária para executar consultas SELECT e retornar resultados como lista de dicionários."""
         conn = None
@@ -31,6 +32,7 @@ class AnalyticsService:
     # ----------------------------------------------------
     # TOOL: get_category_breakdown (Relatório de Distribuição)
     # ----------------------------------------------------
+    @observe()
     def get_category_breakdown(self, user_id: int) -> Dict:
         """
         Calcula a despesa total e percentual por categoria, usando GROUP BY.
@@ -62,6 +64,7 @@ class AnalyticsService:
     # ----------------------------------------------------
     # TOOL: summarize_expense (Resumo Simples)
     # ----------------------------------------------------
+    @observe()
     def summarize_expense(self, user_id: int) -> Dict:
         """
         Fornece um resumo de alto nível (total gasto e contagem de transações).
@@ -92,6 +95,7 @@ class AnalyticsService:
     # ----------------------------------------------------
     # TOOL: get_spending_trends (Análise de Tendências)
     # ----------------------------------------------------
+    @observe()
     def get_spending_trends(self, user_id: int) -> Dict:
         """
         Agrega gastos por mês/ano para identificar tendências.
@@ -114,6 +118,7 @@ class AnalyticsService:
     # ----------------------------------------------------
     # TOOL: detect_anomalies (Deteção de Anomalias Simples no DB)
     # ----------------------------------------------------
+    @observe()
     def detect_anomalies(self, user_id: int) -> List[Dict]:
         """
         Identifica despesas que são significativamente maiores que a média.

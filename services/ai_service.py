@@ -8,6 +8,7 @@ import json
 from google import genai
 from google.genai import types
 from typing import List, Dict, Optional
+from langfuse import observe
 
 # --- Simulação de classes externas (Adaptado para o seu caso de uso) ---
 class PromptLoader:
@@ -44,6 +45,7 @@ class AIService:
     # ----------------------------------------------------
     # TOOL: extract_document_data (Extração Estruturada - Recibos/Faturas)
     # ----------------------------------------------------
+    @observe()
     def extract_document_data(self, document_text: str) -> dict:
         """
         Extrai informações estruturadas (Montante, Descrição, Data) de um texto livre.
@@ -76,6 +78,7 @@ class AIService:
     # ----------------------------------------------------
     # (Interno) TOOL: classify_expense (Categorização)
     # ----------------------------------------------------
+    @observe()
     def classify_expense(self, amount: float, description: str, categories_list: List[str]) -> str:
         """
         Classifica uma transação numa das categorias.
@@ -106,6 +109,7 @@ class AIService:
     # ----------------------------------------------------
     # TOOL: generate_financial_advice (Aconselhamento Financeiro)
     # ----------------------------------------------------
+    @observe()
     def generate_financial_advice(self, user_financial_summary: Dict) -> str:
         """
         Gera conselhos personalizados com base num resumo de dados financeiros do usuário.
@@ -136,6 +140,7 @@ class AIService:
     # ----------------------------------------------------
     # TOOL: ai_assistant (Assistente de Chat)
     # ----------------------------------------------------
+    @observe()
     def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
         """
         Responde a perguntas do usuário sobre finanças, usando dados contextuais.
@@ -165,6 +170,7 @@ class AIService:
     # ----------------------------------------------------
     # (Interno) TOOL: predict_future_spending (Previsão de Gastos)
     # ----------------------------------------------------
+    @observe()
     def predict_future_spending(self, historical_data: str, prediction_period: str = "próximo mês") -> dict:
         """
         Simula a previsão de gastos futuros com base em dados históricos.
