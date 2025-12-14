@@ -1,38 +1,50 @@
 #db_connector.py
 
-import sqlite3 # The actual library for the database
+#import sqlite3 # The actual library for the database
 
-DATABASE_NAME = "unimate_financial_data.db"
+#DATABASE_NAME = "unimate_financial_data.db"
 
-def get_connection(db_file: str):
-    """
-    Returns a new connection object to the database.
-    """
-    conn = sqlite3.connect(db_file)
-    return conn
+#def get_connection(db_file: str):
+   # """
+    #Returns a new connection object to the database.
+    #"""
+    #conn = sqlite3.connect(db_file)
+    #return conn
 
 # Or a class for more complex projects (Singleton Pattern is common here)
-class DBConnector:
+#class DBConnector:
     # ... methods to connect, execute, and close ...
-    pass
+    #pass
 
 
+#import sqlite3
+#from sqlite3 import Error
+#import os
+
+#DATABASE_FILE = 'unimate_financial_data.db'
+
+#def create_connection(db_file=DATABASE_FILE):
+    #"""Cria uma conexão com o banco de dados SQLite."""
+    #conn = None
+    #try:
+        #conn = sqlite3.connect(db_file)
+        #conn.row_factory = sqlite3.Row 
+        #return conn
+    #except Error as e:
+        #print(f"Erro ao conectar com o banco de dados: {e}")
+        #raise
 import sqlite3
-from sqlite3 import Error
-import os
+DATABASE_NAME = "unimate_financial_data.db"
+DATABASE_FILE = "unimate_financial_data.db"
+def get_connection(db_file: str = DATABASE_FILE):
+    conn = sqlite3.connect(db_file)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-DATABASE_FILE = 'unimate_financial_data.db'
-
-def create_connection(db_file=DATABASE_FILE):
-    """Cria uma conexão com o banco de dados SQLite."""
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-        conn.row_factory = sqlite3.Row 
-        return conn
-    except Error as e:
-        print(f"Erro ao conectar com o banco de dados: {e}")
-        raise
+def create_connection(db_file: str = DATABASE_FILE):
+    conn = sqlite3.connect(db_file)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def create_tables(conn):
     """Cria as tabelas (Users, Expenses, Budgets) se não existirem."""
