@@ -1,21 +1,21 @@
 """
-expense_service.py - Gerencia o registro e consulta de despesas do usuário usando SQLite.
-Orquestra chamadas ao AIService para extração e categorização.
+expense_service.py - Manages the registration and query of user expenses using SQLite.
+Orchestrates calls to AIService for extraction and categorization.
 """
 from typing import List, Dict, Optional
 from datetime import datetime
 import sqlite3
 try:
-    from langfuse import observe  # se funcionar, ótimo
+    from langfuse import observe  
 except Exception:
     from utils.observability import observe
 from services import db_connector 
 from services.ai_service import AIService 
 
-# 1. MODELO DE DADOS DE DESPESA 
-# Utilizar dicionário simples para interagir com o DB, 
+# 1. MODELS EXPENSE DATA
+# Uses a simple dictionary to interact with the DB,
 class Expense:
-    # A estrutura da classe reflete a tabela 'expenses'
+    # The class structure reflects the 'expenses' table
     def __init__(self, user_id: int, amount: float, category: str, vendor: str, 
                  transaction_date: str, notes: Optional[str] = None, expense_id: Optional[int] = None):
         self.expense_id = expense_id
@@ -23,13 +23,13 @@ class Expense:
         self.amount = amount
         self.category = category
         self.vendor = vendor
-        self.transaction_date = transaction_date # YYYY-MM-DD
+        self.transaction_date = transaction_date 
         self.notes = notes
         self.created_at = datetime.now().isoformat()
 
     @observe()
     def to_tuple(self):
-        # Usado para INSERT na tabela expenses
+        # Used for INSERT into the expenses table
         return (
             self.user_id,
             self.amount,
@@ -40,24 +40,24 @@ class Expense:
             self.created_at
         )
 
-# --- 2. SERVIÇO DE DESPESAS ---
+# --- 2. EXPENSE SERVICE ---
 class ExpenseService:
     """
-    Implementa a lógica de negócio para manipulação de despesas, usando SQLite.
+    Implements a business logic for managing expenses, using SQLite.
     """
     def __init__(self, db_file: str):
-        # A conexão será estabelecida a cada chamada para ser thread-safe (prática SQLite)
+        # The connection will be established on each call to be thread-safe (SQLite best practice)
         self.db_file = db_file 
         self.ai_client = AIService() 
-        self.valid_categories = ["Mercearia", "Transporte", "Restaurante", "Lazer", "Casa", "Outros"]
+        self.valid_categories = ["Grocery", "Transport", "Restaurant", "Leisure", "Home", "Others"]
 
     # ----------------------------------------------------
-    # TOOL: add_expense (Persistência no DB)
+    # TOOL: add_expense (DB persistence)
     # ----------------------------------------------------
     @observe()
     def add_expense(self, user_id: int, amount: float, description: str, date_str: str, category: str) -> Optional[int]:
         """
-        Insere uma nova despesa na tabela 'expenses'.
+        Inserts a new expense into the 'expenses' table.
         """
         sql = """
         INSERT INTO expenses (user_id, amount, category, vendor, transaction_date, notes, created_at)
@@ -66,38 +66,39 @@ class ExpenseService:
         if amount <= 0:
             raise ValueError("Amount must be greater than 0.")
         
-        # O campo 'vendor' no DB corresponde à 'description' na nossa lógica
+        # The 'vendor' field in the DB corresponds to the 'description' in our logic
         new_expense = Expense(
             user_id=user_id,
             amount=amount,
             category=category,
             vendor=description,
             transaction_date=date_str,
-            notes=f"Categoria classificada por IA: {category}" # Exemplo de nota
+            notes=f"Category classified by AI: {category}" # Example note
         )
 
         conn = None
         try:
-            # Reutiliza a função de conexão do seu módulo
+            # Reuses the connection function from your module
             conn = db_connector.get_connection(self.db_file)
             cursor = conn.cursor()
             cursor.execute(sql, new_expense.to_tuple())
             conn.commit()
-            return cursor.lastrowid # Retorna o ID da despesa recém-criada
+            return cursor.lastrowid 
+        # Returns the ID of the newly created expense
         except sqlite3.Error as e:
-            print(f"Erro ao adicionar despesa ao DB: {e}")
+            print(f"Error adding expense to DB: {e}")
             return None
         finally:
             if conn:
                 conn.close()
 
     # ----------------------------------------------------
-    # TOOL: get_expense (Consulta no DB)
+    # TOOL: get_expense (Consultations on the DB)
     # ----------------------------------------------------
     @observe()
     def get_expense(self, expense_id: int) -> Optional[Dict]:
         """
-        Busca uma despesa específica pelo ID.
+        Search for an expense by ID.
         """
         sql = "SELECT * FROM expenses WHERE id = ?"
         conn = None
@@ -108,38 +109,38 @@ class ExpenseService:
             row = cursor.fetchone()
             
             if row:
-                # O row_factory = sqlite3.Row permite aceder por nome
+                # The row_factory = sqlite3.Row allows access by name
                 return dict(row) 
             return None
         except sqlite3.Error as e:
-            print(f"Erro ao buscar despesa no DB: {e}")
+            print(f"Error fetching expense from DB: {e}")
             return None
         finally:
             if conn:
                 conn.close()
 
     # ----------------------------------------------------
-    # TOOL: add_expense_from_document (Orquestração de IA)
+    # TOOL: add_expense_from_document (Orchestration of AI)
     # ----------------------------------------------------
-    # A lógica aqui permanece a mesma, pois as chamadas para a IA e a adição final
-    # (self.add_expense) já foram tratadas.
+    # The logic here remains the same, as the calls to the AI and final addition
+    # (self.add_expense) have already been handled.
 
     @observe()
     def add_expense_from_document(self, user_id: int, document_text: str) -> Optional[int]:
         """
-        Processa texto de um documento/notificação para extrair, classificar e salvar uma despesa.
+        Process text from a document/notification to extract, classify and save an expense.
         """
-        # 1. Extração (Chamada à IA)
+        # 1. Extraction (Call to AI)
         extracted_data = self.ai_client.extract_document_data(document_text)
         
         amount = extracted_data.get("amount", 0.0)
-        description = extracted_data.get("description", "Descrição não extraída")
+        description = extracted_data.get("description", "Description not extracted")
         date_str = extracted_data.get("date", datetime.now().strftime('%Y-%m-%d'))
 
         if amount <= 0:
-            return None # Falha na extração de montante
+            return None # Extraction failed
 
-        # 2. Classificação (Chamada à IA)
+        # 2. Classification (Call to AI)
         category_result = self.ai_client.classify_expense(
             amount=amount,
             description=description,
@@ -147,7 +148,7 @@ class ExpenseService:
         )
         final_category = category_result.split('\n')[0].strip()
         if final_category not in self.valid_categories:
-            final_category = "Outros"   
-        # 3. Adição da Despesa (Persistência no DB)
-        print(f"Salvando despesa: {description} ({amount}) -> Categoria: {final_category}")
+            final_category = "Others"   
+        # 3. Add Expense (Persistence in DB)
+        print(f"Saving expense: {description} ({amount}) -> Category: {final_category}")
         return self.add_expense(user_id, amount, description, date_str, final_category)
