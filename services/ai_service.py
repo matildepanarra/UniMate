@@ -8,7 +8,10 @@ import json
 from google import genai
 from google.genai import types
 from typing import List, Dict, Optional
-from langfuse import observe
+try:
+    from langfuse import observe  # se funcionar, ótimo
+except Exception:
+    from utils.observability import observe
 
 # --- Simulação de classes externas (Adaptado para o seu caso de uso) ---
 class PromptLoader:

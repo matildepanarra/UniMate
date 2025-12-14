@@ -5,7 +5,10 @@ Orquestra chamadas ao AIService para extração e categorização.
 from typing import List, Dict, Optional
 from datetime import datetime
 import sqlite3
-from langfuse import observe
+try:
+    from langfuse import observe  # se funcionar, ótimo
+except Exception:
+    from utils.observability import observe
 from services import db_connector 
 from services.ai_service import AIService 
 

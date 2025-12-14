@@ -5,7 +5,10 @@ from typing import List, Dict
 import sqlite3
 from services import db_connector
 from datetime import datetime
-from langfuse import observe
+try:
+    from langfuse import observe  # se funcionar, ótimo
+except Exception:
+    from utils.observability import observe
 from typing import Optional, Tuple
 
 class AnalyticsService:
