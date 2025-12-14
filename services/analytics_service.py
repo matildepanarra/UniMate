@@ -1,12 +1,12 @@
 """
-analytics_service.py - Fornece relatórios e insights de dados agregados usando SQLite.
+analytics_service.py - Gives reports and insights of aggregated data using SQLite.
 """
 from typing import List, Dict
 import sqlite3
 from services import db_connector
 from datetime import datetime
 try:
-    from langfuse import observe  # se funcionar, ótimo
+    from langfuse import observe  
 except Exception:
     from utils.observability import observe
 from typing import Optional, Tuple
@@ -15,10 +15,10 @@ class AnalyticsService:
     def __init__(self, db_file: str):
         self.db_file = db_file
 
-    # --- Funções Auxiliares de DB ---
+    # ---Auxiliary DB Functions---
     @observe()
     def _execute_query(self, sql: str, params: Optional[Tuple] = None) -> List[Dict]:
-        """Função utilitária para executar consultas SELECT e retornar resultados como lista de dicionários."""
+        """Function used to execute SELECT queries and return results as a list of dictionaries."""
         conn = None
         try:
             conn = db_connector.get_connection(self.db_file)
@@ -27,19 +27,19 @@ class AnalyticsService:
             cursor.execute(sql, params or ())
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            print(f"Erro na consulta SQL: {e}")
+            print(f"Error in the SQL query: {e}")
             return []
         finally:
             if conn:
                 conn.close()
 
     # ----------------------------------------------------
-    # TOOL: get_category_breakdown (Relatório de Distribuição)
+    # TOOL: get_category_breakdown (Distribution Report)
     # ----------------------------------------------------
     @observe()
     def get_category_breakdown(self, user_id: int) -> Dict:
         """
-        Calcula a despesa total e percentual por categoria, usando GROUP BY.
+        Calculates the total and percentage spent per category, using GROUP BY.
         """
         sql = """
         SELECT 
@@ -66,12 +66,12 @@ class AnalyticsService:
         return breakdown
 
     # ----------------------------------------------------
-    # TOOL: summarize_expense (Resumo Simples)
+    # TOOL: summarize_expense (Simple Summary)
     # ----------------------------------------------------
     @observe()
     def summarize_expense(self, user_id: int) -> Dict:
         """
-        Fornece um resumo de alto nível (total gasto e contagem de transações).
+        Provides a high-level summary (total spent and transaction count).
         """
         sql = """
         SELECT 
@@ -83,7 +83,6 @@ class AnalyticsService:
         """
         summary = self._execute_query(sql, (user_id,))
         
-        # O resultado vem como uma lista com um dicionário
         if summary and summary[0]['total_spent'] is not None:
             return {
                 "total_spent_lifetime": round(summary[0]['total_spent'], 2),
@@ -97,12 +96,12 @@ class AnalyticsService:
         }
 
     # ----------------------------------------------------
-    # TOOL: get_spending_trends (Análise de Tendências)
+    # TOOL: get_spending_trends (Trend Analysis)
     # ----------------------------------------------------
     @observe()
     def get_spending_trends(self, user_id: int) -> Dict:
         """
-        Agrega gastos por mês/ano para identificar tendências.
+        Aggregates expenses by month/year to identify trends.
         """
         sql = """
         SELECT
@@ -115,25 +114,24 @@ class AnalyticsService:
         """
         trends_data = self._execute_query(sql, (user_id,))
         
-        # Formatar para um dicionário de tendências
         trends = {item['year_month']: round(item['total_spent'], 2) for item in trends_data}
         return {"period": "monthly", "data": trends}
 
     # ----------------------------------------------------
-    # TOOL: detect_anomalies (Deteção de Anomalias Simples no DB)
+    # TOOL: detect_anomalies (Simple Anomaly Detection in DB)
     # ----------------------------------------------------
     @observe()
     def detect_anomalies(self, user_id: int) -> List[Dict]:
         """
-        Identifica despesas que são significativamente maiores que a média.
-        Usamos uma subconsulta para calcular a média de gastos do usuário.
+        Identifies expenses that are significantly larger than the average.
+        We use a subquery to calculate the average spending of the user.
         """
         sql = """
         SELECT
             id, amount, vendor, transaction_date
         FROM expenses
         WHERE user_id = ? AND amount > (
-            SELECT AVG(amount) * 2.0  -- Condição: Montante > 2 vezes a média
+            SELECT AVG(amount) * 2.0  -- Condition: Amount > 2 times the average
             FROM expenses
             WHERE user_id = ? AND amount > 0 
         )
@@ -145,7 +143,7 @@ class AnalyticsService:
                 "expense_id": a['id'], 
                 "amount": a['amount'], 
                 "description": a['vendor'], 
-                "reason": "Valor excede 200% do valor médio de transação."
+                "reason": "Value exceeds 200% of the average transaction value."
             }
             for a in anomalies
         ]
