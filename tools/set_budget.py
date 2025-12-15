@@ -1,45 +1,54 @@
-"""
-tools/budget/set_budget.py - Define/Atualiza o limite de orçamento.
-"""
 import sqlite3
-from services import db_connector
 from typing import Optional
 from datetime import datetime
 
-def set_budget(db_file: str, user_id: int, category: str, amount_limit: float, 
-                        start_date: str, end_date: str) -> Optional[int]:
+from services import db_connector
+
+
+def set_budget(
+    db_file: str,
+    user_id: int,
+    category: str,
+    amount_limit: float,
+    start_date: str,
+    end_date: str,
+) -> Optional[int]:
     """
-    TOOL: set_budget. Atualiza ou insere (upsert) um orçamento.
-    
-    Args: start_date (YYYY-MM-DD), end_date (YYYY-MM-DD).
+    Inserts or updates a budget for a given user/category/month.
     """
-    created_at = datetime.now().isoformat()
-    
+
+    sql = """
+    INSERT INTO budgets (user_id, category, amount_limit, start_date, end_date, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, category, start_date, end_date)
+    DO UPDATE SET amount_limit = excluded.amount_limit
+    """
+
     conn = None
     try:
+        # ✅ usar SEMPRE o mesmo helper do projeto
         conn = db_connector.create_connection(db_file)
         cursor = conn.cursor()
-        
-        # 1. Tenta Atualizar
-        sql_update = """
-        UPDATE budgets SET amount_limit = ?, created_at = ?
-        WHERE user_id = ? AND category = ? AND start_date = ?
-        """
-        cursor.execute(sql_update, (amount_limit, created_at, user_id, category, start_date))
-        
-        if cursor.rowcount == 0:
-            # 2. Se não atualizou (rowcount == 0), insere um novo
-            sql_insert = """
-            INSERT INTO budgets (user_id, category, amount_limit, start_date, end_date, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """
-            cursor.execute(sql_insert, (user_id, category, amount_limit, start_date, end_date, created_at))
-        
+
+        cursor.execute(
+            sql,
+            (
+                user_id,
+                category,
+                amount_limit,
+                start_date,
+                end_date,
+                datetime.now().isoformat(),
+            ),
+        )
+
         conn.commit()
         return cursor.lastrowid
+
     except sqlite3.Error as e:
-        print(f"Erro ao atualizar/inserir orçamento: {e}")
+        print(f"[set_budget TOOL ERROR]: {e}")
         return None
+
     finally:
         if conn:
             conn.close()
