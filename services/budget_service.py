@@ -1,29 +1,218 @@
+#"""
+#budget_service.py - Manages budgets, limits and user status using SQLite.
+#Depends on ExpenseService for spending data.
+#"""
+#from typing import List, Dict, Optional
+#from datetime import datetime
+#import sqlite3
+#try:
+#    from langfuse import observe  
+#except Exception:
+#    from utils.observability import observe
+#from services import db_connector 
+#from services.ai_service import AIService 
+#from typing import Optional, Tuple
+#import json
+#
+## --- Budget Service ---
+#class BudgetService:
+#    def __init__(self, db_file: str):
+#        self.db_file = db_file
+#        self.ai_client = AIService()
+#
+#    # --- Auxiliary DB Functions ---
+#    @observe()
+#    def _get_current_month_dates(self) -> Tuple[str, str]:
+#        """Returns the first and last day of the current month (YYYY-MM-DD)."""
+#        now = datetime.now()
+#        start_date = now.strftime("%Y-%m-01")
+#
+#        if now.month == 12:
+#            end_date = datetime(now.year + 1, 1, 1).strftime("%Y-%m-%d")
+#        else:
+#            end_date = datetime(now.year, now.month + 1, 1).strftime("%Y-%m-%d")
+#        return start_date, end_date
+#    
+#    # ----------------------------------------------------
+#    # TOOL: set_budget (Persistency in the DB)
+#    # ----------------------------------------------------
+#    @observe()
+#    def set_budget(self, user_id: int, category: str, amount_limit: float) -> Optional[int]:
+#        """
+#        Define or update a budget limit (assumed to be monthly) in the 'budgets' table.
+#        """
+#        start_date, end_date = self._get_current_month_dates()
+#        created_at = datetime.now().isoformat()
+#        
+#        conn = None
+#        try:
+#            conn = db_connector.get_connection(self.db_file)
+#            cursor = conn.cursor()
+#            
+#            sql_update = """
+#            UPDATE budgets SET amount_limit = ?, created_at = ?
+#            WHERE user_id = ? AND category = ? AND start_date = ?
+#            """
+#            cursor.execute(sql_update, (amount_limit, created_at, user_id, category, #start_date))
+#            
+#            if cursor.rowcount == 0:
+#                sql_insert = """
+#                INSERT INTO budgets (user_id, category, amount_limit, start_date, end_date, #created_at)
+#                VALUES (?, ?, ?, ?, ?, ?)
+#                """
+#                cursor.execute(sql_insert, (user_id, category, amount_limit, start_date, #end_date, created_at))
+#            
+#            conn.commit()
+#            print(f"Budget to {category} defined/updated for R$ {amount_limit}.")
+#            return cursor.lastrowid
+#        except sqlite3.Error as e:
+#            print(f"Error defining budget in DB: {e}")
+#            return None
+#        finally:
+#            if conn:
+#                conn.close()
+#
+#    # ----------------------------------------------------
+#    # TOOL: budget_calculator -> get_budget_status (Consults in the DB)
+#    # ----------------------------------------------------
+#    @observe()
+#    def get_budget_status(self, user_id: int) -> List[Dict]:
+#        """
+#        Calculates the current status of all budgets (Limit vs. Actual Spending).
+#        This uses a subquery SQL to calculate the spending per category.
+#        """
+#        start_date, end_date = self._get_current_month_dates()
+#
+#        sql = f"""
+#        SELECT 
+#            b.category,
+#            b.amount_limit,
+#            -- Subconsulta para calcular o total gasto neste mês
+#            COALESCE(SUM(e.amount), 0.0) AS spent
+#        FROM budgets b
+#        LEFT JOIN expenses e ON b.user_id = e.user_id AND b.category = e.category
+#            AND e.transaction_date >= '{start_date}' AND e.transaction_date < '{end_date}'
+#        WHERE b.user_id = ? AND b.start_date = '{start_date}'
+#        GROUP BY b.category, b.amount_limit
+#        """
+#        conn = None
+#        status_report = []
+#        try:
+#            conn = db_connector.get_connection(self.db_file)
+#            conn.row_factory = sqlite3.Row
+#            cursor = conn.cursor()
+#            cursor.execute(sql, (user_id,))
+#            
+#            for row in cursor.fetchall():
+#                spent = row['spent']
+#                limit = row['amount_limit']
+#                remaining = limit - spent
+#                
+#                status_report.append({
+#                    "category": row['category'],
+#                    "limit": limit,
+#                    "spent": round(spent, 2),
+#                    "remaining": round(remaining, 2),
+#                    "status": "Exceeded" if remaining < 0 else ("Approaching Limit" if #remaining / limit < 0.2 else "OK")
+#                })
+#            return status_report
+#        except sqlite3.Error as e:
+#            print(f"Error getting budget status: {e}")
+#            return []
+#        finally:
+#            if conn:
+#                conn.close()
+#
+#    # ----------------------------------------------------
+#    # TOOL: budget_calculator -> analyze_budget (AI Analysis)
+#    # ----------------------------------------------------
+#    @observe()
+#    def analyze_budget(self, user_id: int) -> Dict:
+#        """
+#        Orchestrates the budget analysis, getting data and calling the AI prediction.
+#        """
+#        # (The logic of fetching data for the AI and calling predict_future_spending
+#        #  from AIService remains the same from the previous draft, adapted for DB)
+#        
+#        # 1. Retrieve spending data (Simply retrieve all expenses for the AI)
+#        conn = None
+#        historical_data = []
+#        try:
+#            conn = db_connector.get_connection(self.db_file)
+#            sql_expenses = "SELECT transaction_date, amount FROM expenses WHERE user_id = ? #ORDER BY transaction_date DESC LIMIT 100"
+#            cursor = conn.cursor()
+#            cursor.execute(sql_expenses, (user_id,))
+#            
+#            historical_data = [{'date': row['transaction_date'], 'amount': row['amount']} #for row in cursor.fetchall()]
+#
+#        except sqlite3.Error as e:
+#            print(f"Error fetching historical data for analysis: {e}")
+#        finally:
+#            if conn:
+#                conn.close()
+#        
+#        if not historical_data:
+#            return {"advice": "Insufficient data for budget analysis."}
+#        
+#        historical_data_json = json.dumps(historical_data)
+#        
+#        # 2. Call to AIService (AI_SERVICE: predict_future_spending)
+#        prediction_result = self.ai_client.predict_future_spending(
+#            historical_data=historical_data_json,
+#            prediction_period="the next month"
+#        )
+#
+#        # 3. Generates advice (the AIService does the final reasoning)
+#        status = self.get_budget_status(user_id)
+#        
+#        full_analysis_context = {
+#            "prediction": prediction_result,
+#            "current_budget_status": status,
+#            "recent_spending": historical_data[:10]
+#        }
+#
+#        # Call the AIService to generate final advice (TOOL: generate_financial_advice)
+#        recommendation_text = self.ai_client.generate_financial_advice#(full_analysis_context)
+#
+#        return {
+#            "prediction": prediction_result,
+#            "recommendation": recommendation_text
+#        }
+
+
+
+
+
+
+
 """
-budget_service.py - Manages budgets, limits and user status using SQLite.
-Depends on ExpenseService for spending data.
+budget_service.py - Gerencia orçamentos, limites e status do usuário.
+Este serviço ORQUESTRA as TOOLS set_budget e budget_calculator.
 """
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-import sqlite3
-try:
-    from langfuse import observe  
-except Exception:
-    from utils.observability import observe
-from services import db_connector 
+import sqlite3 # Necessário apenas para o tratamento de erros
+from langfuse import observe
 from services.ai_service import AIService 
-from typing import Optional, Tuple
 import json
+
+# --- IMPORTAÇÃO DAS TOOLS ---
+# Assumimos que a sua estrutura de pastas permite estas importações:
+# (Ex: se /tools estiver no PYTHONPATH ou importado como módulo)
+from tools import set_budget as set_budget_tool
+from tools import budget_calculator as budget_calc_tool
 
 # --- Budget Service ---
 class BudgetService:
     def __init__(self, db_file: str):
         self.db_file = db_file
-        self.ai_client = AIService()
+        # O AIClient é a Tool de IA que este serviço usa para análise
+        self.ai_client = AIService() 
 
-    # --- Auxiliary DB Functions ---
+    # --- Funções Auxiliares de DB (Mantidas localmente, pois são lógicas de serviço) ---
     @observe()
     def _get_current_month_dates(self) -> Tuple[str, str]:
-        """Returns the first and last day of the current month (YYYY-MM-DD)."""
+        """Retorna o primeiro e o primeiro dia do próximo mês (YYYY-MM-DD)."""
         now = datetime.now()
         start_date = now.strftime("%Y-%m-01")
 
@@ -34,107 +223,84 @@ class BudgetService:
         return start_date, end_date
     
     # ----------------------------------------------------
-    # TOOL: set_budget (Persistency in the DB)
+    # SERVICE: set_budget (Orquestração da Tool de Persistência)
     # ----------------------------------------------------
     @observe()
     def set_budget(self, user_id: int, category: str, amount_limit: float) -> Optional[int]:
         """
-        Define or update a budget limit (assumed to be monthly) in the 'budgets' table.
+        Orquestra a definição do orçamento, delegando a lógica SQL à Tool.
         """
         start_date, end_date = self._get_current_month_dates()
-        created_at = datetime.now().isoformat()
         
-        conn = None
+        # DELEGAÇÃO: Chamada à TOOL set_budget.py
         try:
-            conn = db_connector.get_connection(self.db_file)
-            cursor = conn.cursor()
-            
-            sql_update = """
-            UPDATE budgets SET amount_limit = ?, created_at = ?
-            WHERE user_id = ? AND category = ? AND start_date = ?
-            """
-            cursor.execute(sql_update, (amount_limit, created_at, user_id, category, start_date))
-            
-            if cursor.rowcount == 0:
-                sql_insert = """
-                INSERT INTO budgets (user_id, category, amount_limit, start_date, end_date, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """
-                cursor.execute(sql_insert, (user_id, category, amount_limit, start_date, end_date, created_at))
-            
-            conn.commit()
-            print(f"Budget to {category} defined/updated for R$ {amount_limit}.")
-            return cursor.lastrowid
+            budget_id = set_budget_tool.set_budget(
+                db_file=self.db_file, 
+                user_id=user_id, 
+                category=category, 
+                amount_limit=amount_limit, 
+                start_date=start_date, 
+                end_date=end_date
+            )
+            print(f"Orçamento para {category} definido/atualizado para R$ {amount_limit}.")
+            return budget_id
         except sqlite3.Error as e:
-            print(f"Error defining budget in DB: {e}")
+            # Captura erros que podem ser levantados pela Tool
+            print(f"Erro ao definir orçamento (Delegado à Tool): {e}")
             return None
-        finally:
-            if conn:
-                conn.close()
 
     # ----------------------------------------------------
-    # TOOL: budget_calculator -> get_budget_status (Consults in the DB)
+    # SERVICE: get_budget_status (Orquestração da Tool de Consulta e Regras de Negócio)
     # ----------------------------------------------------
     @observe()
     def get_budget_status(self, user_id: int) -> List[Dict]:
         """
-        Calculates the current status of all budgets (Limit vs. Actual Spending).
-        This uses a subquery SQL to calculate the spending per category.
+        Calcula o status atual de todos os orçamentos (Limite vs. Gasto Real).
+        O cálculo do status (OK, Excedido) é a lógica de negócio do Service.
         """
         start_date, end_date = self._get_current_month_dates()
 
-        sql = f"""
-        SELECT 
-            b.category,
-            b.amount_limit,
-            -- Subconsulta para calcular o total gasto neste mês
-            COALESCE(SUM(e.amount), 0.0) AS spent
-        FROM budgets b
-        LEFT JOIN expenses e ON b.user_id = e.user_id AND b.category = e.category
-            AND e.transaction_date >= '{start_date}' AND e.transaction_date < '{end_date}'
-        WHERE b.user_id = ? AND b.start_date = '{start_date}'
-        GROUP BY b.category, b.amount_limit
-        """
-        conn = None
+        # DELEGAÇÃO: Chamada à TOOL budget_calculator.py para obter dados brutos (limite e gasto)
+        raw_report = budget_calc_tool.budget_calculator(
+            db_file=self.db_file, 
+            user_id=user_id, 
+            start_date=start_date, 
+            end_date=end_date
+        )
+        
         status_report = []
-        try:
-            conn = db_connector.get_connection(self.db_file)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(sql, (user_id,))
+        for row in raw_report:
+            spent = row['spent']
+            limit = row['amount_limit']
+            remaining = limit - spent
             
-            for row in cursor.fetchall():
-                spent = row['spent']
-                limit = row['amount_limit']
-                remaining = limit - spent
-                
-                status_report.append({
-                    "category": row['category'],
-                    "limit": limit,
-                    "spent": round(spent, 2),
-                    "remaining": round(remaining, 2),
-                    "status": "Exceeded" if remaining < 0 else ("Approaching Limit" if remaining / limit < 0.2 else "OK")
-                })
-            return status_report
-        except sqlite3.Error as e:
-            print(f"Error getting budget status: {e}")
-            return []
-        finally:
-            if conn:
-                conn.close()
+            # LÓGICA DE NEGÓCIO AQUI (Regras de Status)
+            if remaining < 0:
+                status_text = "Excedido"
+            elif remaining / limit < 0.2:
+                status_text = "Atingindo Limite"
+            else:
+                status_text = "OK"
+
+            status_report.append({
+                "category": row['category'],
+                "limit": limit,
+                "spent": round(spent, 2),
+                "remaining": round(remaining, 2),
+                "status": status_text
+            })
+        return status_report
 
     # ----------------------------------------------------
-    # TOOL: budget_calculator -> analyze_budget (AI Analysis)
+    # SERVICE: analyze_budget (Orquestração de Múltiplas Tools - DB e AI)
     # ----------------------------------------------------
     @observe()
     def analyze_budget(self, user_id: int) -> Dict:
         """
-        Orchestrates the budget analysis, getting data and calling the AI prediction.
+        Orquestra a análise do orçamento, buscando dados e chamando a previsão/conselho da IA.
         """
-        # (The logic of fetching data for the AI and calling predict_future_spending
-        #  from AIService remains the same from the previous draft, adapted for DB)
-        
-        # 1. Retrieve spending data (Simply retrieve all expenses for the AI)
+        # 1. Recuperar dados de gastos (A lógica SQL permanece a mesma, mas deveria estar noutra tool de Analytics)
+        # NOTA: Para este exemplo, mantemos a busca SQL direta para não criar mais uma Tool.
         conn = None
         historical_data = []
         try:
@@ -146,23 +312,23 @@ class BudgetService:
             historical_data = [{'date': row['transaction_date'], 'amount': row['amount']} for row in cursor.fetchall()]
 
         except sqlite3.Error as e:
-            print(f"Error fetching historical data for analysis: {e}")
+            print(f"Erro ao buscar histórico para análise: {e}")
         finally:
             if conn:
                 conn.close()
         
         if not historical_data:
-            return {"advice": "Insufficient data for budget analysis."}
+            return {"advice": "Dados insuficientes para análise de orçamento."}
         
         historical_data_json = json.dumps(historical_data)
         
-        # 2. Call to AIService (AI_SERVICE: predict_future_spending)
+        # 2. Chamada à TOOL de IA (predict_future_spending)
         prediction_result = self.ai_client.predict_future_spending(
             historical_data=historical_data_json,
-            prediction_period="the next month"
+            prediction_period="o próximo mês"
         )
-
-        # 3. Generates advice (the AIService does the final reasoning)
+        
+        # 3. Preparar o contexto (usando a lógica de status que está no Service)
         status = self.get_budget_status(user_id)
         
         full_analysis_context = {
@@ -170,8 +336,8 @@ class BudgetService:
             "current_budget_status": status,
             "recent_spending": historical_data[:10]
         }
-
-        # Call the AIService to generate final advice (TOOL: generate_financial_advice)
+        
+        # 4. Chamada à TOOL de IA (generate_financial_advice)
         recommendation_text = self.ai_client.generate_financial_advice(full_analysis_context)
 
         return {
