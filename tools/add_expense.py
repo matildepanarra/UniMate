@@ -3,7 +3,7 @@ import sqlite3
 import services.db_connector as db_connector
 from typing import Optional
 
-def insert_new_expense(db_file: str, user_id: int, amount: float, category: str, vendor: str, transaction_date: str) -> Optional[int]:
+def add_expense(db_file: str, user_id: int, amount: float, category: str, vendor: str, transaction_date: str) -> Optional[int]:
     # 1. Montar a QUERY SQL
     sql = "INSERT INTO expenses (user_id, amount, category, vendor, transaction_date, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))"
     

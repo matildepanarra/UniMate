@@ -5,7 +5,7 @@ import sqlite3
 from services import db_connector
 from typing import Optional, Dict
 
-def select_expense_by_id(db_file: str, expense_id: int) -> Optional[Dict]:
+def get_expense(db_file: str, expense_id: int) -> Optional[Dict]:
     """
     TOOL: get_expense. Busca uma despesa específica pelo ID.
     """
