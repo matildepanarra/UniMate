@@ -5,7 +5,7 @@ import sqlite3
 from services import db_connector
 from typing import List, Dict
 
-def get_spending_trends_data(db_file: str, user_id: int) -> List[Dict]:
+def get_spending_trend(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: get_spending_trends. Agrega gastos por mês/ano.
     """

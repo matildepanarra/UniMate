@@ -5,7 +5,7 @@ import sqlite3
 from services import db_connector
 from typing import List, Dict
 
-def calculate_budget_status(db_file: str, user_id: int, start_date: str, end_date: str) -> List[Dict]:
+def budget_calculator(db_file: str, user_id: int, start_date: str, end_date: str) -> List[Dict]:
     """
     TOOL: budget_calculator (get_budget_status). Calcula o gasto real de um período por categoria 
     e compara com os limites definidos na tabela 'budgets'.
