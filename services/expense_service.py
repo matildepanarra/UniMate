@@ -194,12 +194,14 @@ class ExpenseService:
             transaction_date=date_str,         # ✅ date_str -> transaction_date
         )
 
+    # CÓDIGO CORRIGIDO/SIMPLIFICADO:
     @observe()
     def get_expense(self, expense_id: int) -> Optional[Dict]:
-        # se a tua tool get_expense também precisar de db_file, diz-me e ajusto
-        return get_expense(db_file=self.db_file, expense_id=expense_id) \
-            if "db_file" in get_expense.__code__.co_varnames else get_expense(expense_id)
-
+        # Se a Toolget_expense SEMPRE precisar de db_file, simplesmente passe-o.
+        # Isto elimina a inspeção __code__ que causa o erro no mock.
+        return get_expense(db_file=self.db_file, expense_id=expense_id)
+    
+    
     @observe()
     def summarize_expense(self, user_id: int) -> Dict:
         return summarize_expense(db_file=self.db_file, user_id=user_id) \
