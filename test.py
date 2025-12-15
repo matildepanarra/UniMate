@@ -171,35 +171,36 @@ with tab3:
     expense_service = st.session_state.expense_service
     analytics_service = st.session_state.analytics_service
 
-    # TOOL: summarize_expense (via ExpenseService tool)
-    summary = expense_service.summarize_expense(USER_ID)
+    # --- AnalyticsService: summarize_expense ---
+    st.subheader("Expense Summary (AnalyticsService)")
+    summary = analytics_service.summarize_expense(USER_ID)
 
-    st.subheader("Expense Summary (via ExpenseService Tool)")
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Spent Lifetime", f"€ {summary.get('total_spent_lifetime', 0.0):.2f}")
-    col2.metric("Total Transactions", summary.get("transaction_count", 0))
+    col2.metric("Total Transactions", int(summary.get("transaction_count", 0)))
     col3.metric("Average Value", f"€ {summary.get('avg_transaction_value', 0.0):.2f}")
 
     st.divider()
 
-    # Chart: Distribution by Category (AnalyticsService)
+    # --- AnalyticsService: Category Breakdown chart ---
     st.subheader("Distribution by Category")
     breakdown = analytics_service.get_category_breakdown(USER_ID)
 
-    if breakdown.get("total_spent_lifetime", 0) > 0:
+    total_lifetime = breakdown.get("total_spent_lifetime", 0.0)
+    if total_lifetime and total_lifetime > 0:
         data_list = [
-            {"Category": cat, "Amount": data["total"]}
+            {"Category": cat, "Amount": float(data.get("total", 0.0))}
             for cat, data in breakdown.items()
             if cat != "total_spent_lifetime"
         ]
-        df = pd.DataFrame(data_list)
-        st.bar_chart(df, x="Category", y="Amount")
+        df = pd.DataFrame(data_list).sort_values("Amount", ascending=False)
+        st.bar_chart(df, x="Category", y="Amount", use_container_width=True)
     else:
         st.info("No expenses available to generate category distribution.")
 
     st.divider()
 
-    # Anomaly Detection (AnalyticsService)
+    # --- AnalyticsService: Anomaly Detection ---
     st.subheader("Anomaly Alert")
     anomalies = analytics_service.detect_anomalies(USER_ID)
 
@@ -211,8 +212,8 @@ with tab3:
 
     st.divider()
 
-    # TOOL: get_expense (manual lookup)
-    st.subheader("Lookup Expense by ID (get_expense tool)")
+    # --- ExpenseService tool: get_expense (manual lookup) ---
+    st.subheader("Lookup Expense by ID")
     expense_id_lookup = st.number_input(
         "Expense ID",
         min_value=1,
@@ -221,7 +222,13 @@ with tab3:
     )
 
     if st.button("Fetch Expense", key="fetch_expense_tab3"):
-        expense = expense_service.get_expense(int(expense_id_lookup))
+        try:
+            # Ajusta esta assinatura se o teu get_expense NÃO pedir USER_ID
+            expense = expense_service.get_expense(USER_ID, int(expense_id_lookup))
+        except TypeError:
+            # fallback caso a tua assinatura seja get_expense(expense_id)
+            expense = expense_service.get_expense(int(expense_id_lookup))
+
         if expense:
             st.success("Expense found:")
             st.json(expense)
@@ -229,10 +236,9 @@ with tab3:
             st.warning("No expense found with that ID.")
 
     st.caption(
-        "This tab uses ExpenseService tools (summarize_expense, get_expense) "
-        "and AnalyticsService for charts & anomaly detection."
+        "This tab uses AnalyticsService (summarize_expense, get_category_breakdown, detect_anomalies) "
+        "and ExpenseService (get_expense)."
     )
-
 
 # ----------------------------------------
 # TAB 4: AI ASSISTANT
