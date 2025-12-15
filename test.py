@@ -134,26 +134,23 @@ with tab2:
     st.header("Budget Management")
     budget_service = st.session_state.budget_service
     expense_service = st.session_state.expense_service
-
+    
     st.subheader("1. Set Monthly Limit")
-    categories = expense_service.valid_categories
-
+    categories = expense_service.valid_categories 
+    
     col1, col2 = st.columns(2)
     category = col1.selectbox("Category:", categories, key="budget_cat_select_tab2")
     amount_limit = col2.number_input(f"Monthly Limit for {category} (€)", min_value=0.0, step=10.0)
 
     if st.button("Save Budget", key="save_budget_btn_tab2"):
-        budget_id = budget_service.set_budget(USER_ID, category, amount_limit)
-        if budget_id:
-            st.success(f"Limit of €{amount_limit:.2f} set for {category}. (Budget ID: {budget_id})")
-        else:
-            st.error("Failed to set budget. Check DB/tool logs.")
-
+        budget_service.set_budget(USER_ID, category, amount_limit)
+        st.success(f"Limit of €{amount_limit:.2f} set for {category}.")
+    
     st.divider()
-
+    
     st.subheader("2. Current Status and AI Analysis")
     status_report = budget_service.get_budget_status(USER_ID)
-
+    
     if status_report:
         st.dataframe(pd.DataFrame(status_report), use_container_width=True)
 
@@ -161,10 +158,9 @@ with tab2:
             with st.spinner("AI is analyzing the history and budget..."):
                 analysis_result = budget_service.analyze_budget(USER_ID)
             st.info("AI Recommendation:")
-            st.write(analysis_result.get("recommendation", "No recommendation could be generated."))
+            st.write(analysis_result.get('recommendation', 'NNo recommendation could be generated.'))
     else:
         st.info("No active budget found.")
-
 
 # ----------------------------------------
 # TAB 3: ANALYTICS (EXPENSE TOOLS + CHARTS)
