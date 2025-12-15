@@ -46,7 +46,7 @@ if "services_ready" not in st.session_state:
         conn.commit()
         conn.close()
 
-        # 2. Store services in session state
+        # 2. Store services in session state (ALIGNED WITH SERVICES)
         st.session_state.expense_service = ExpenseService(db_file=DB_FILE)
         st.session_state.budget_service = BudgetService(db_file=DB_FILE)
         st.session_state.analytics_service = AnalyticsService(db_file=DB_FILE)
@@ -100,6 +100,7 @@ with st.sidebar:
 # Main content area - Tabs
 tab1, tab2, tab3, tab4 = st.tabs(["💰 Expenses (AI)", "📊 Budgets", "📈 Analytics", "🤖 AI Assistant"])
 
+
 # ----------------------------------------
 # TAB 1: EXPENSES (AI-Driven)
 # ----------------------------------------
@@ -125,6 +126,7 @@ with tab1:
             else:
                 st.error("Failed to process the expense. Check logs and your Gemini key.")
 
+
 # ----------------------------------------
 # TAB 2: BUDGETS
 # ----------------------------------------
@@ -141,8 +143,11 @@ with tab2:
     amount_limit = col2.number_input(f"Monthly Limit for {category} (€)", min_value=0.0, step=10.0)
 
     if st.button("Save Budget", key="save_budget_btn_tab2"):
-        budget_service.set_budget(USER_ID, category, amount_limit)
-        st.success(f"Limit of €{amount_limit:.2f} set for {category}.")
+        budget_id = budget_service.set_budget(USER_ID, category, amount_limit)
+        if budget_id:
+            st.success(f"Limit of €{amount_limit:.2f} set for {category}. (Budget ID: {budget_id})")
+        else:
+            st.error("Failed to set budget. Check DB/tool logs.")
 
     st.divider()
 
@@ -160,9 +165,7 @@ with tab2:
     else:
         st.info("No active budget found.")
 
-# ----------------------------------------
-# TAB 3: ANALYTICS (USING EXPENSE SERVICE TOOLS)
-# ----------------------------------------
+
 # ----------------------------------------
 # TAB 3: ANALYTICS (EXPENSE TOOLS + CHARTS)
 # ----------------------------------------
@@ -170,11 +173,9 @@ with tab3:
     st.header("Financial Analytics (Expense Tools)")
 
     expense_service = st.session_state.expense_service
-    analytics_service = st.session_state.analytics_service  # só para breakdown/anomalies
+    analytics_service = st.session_state.analytics_service
 
-    # =========================
-    # TOOL: summarize_expense
-    # =========================
+    # TOOL: summarize_expense (via ExpenseService tool)
     summary = expense_service.summarize_expense(USER_ID)
 
     st.subheader("Expense Summary (via ExpenseService Tool)")
@@ -185,11 +186,8 @@ with tab3:
 
     st.divider()
 
-    # =========================
-    # CHART: Distribution by Category
-    # =========================
+    # Chart: Distribution by Category (AnalyticsService)
     st.subheader("Distribution by Category")
-
     breakdown = analytics_service.get_category_breakdown(USER_ID)
 
     if breakdown.get("total_spent_lifetime", 0) > 0:
@@ -198,7 +196,6 @@ with tab3:
             for cat, data in breakdown.items()
             if cat != "total_spent_lifetime"
         ]
-
         df = pd.DataFrame(data_list)
         st.bar_chart(df, x="Category", y="Amount")
     else:
@@ -206,11 +203,8 @@ with tab3:
 
     st.divider()
 
-    # =========================
-    # ANOMALY DETECTION
-    # =========================
+    # Anomaly Detection (AnalyticsService)
     st.subheader("Anomaly Alert")
-
     anomalies = analytics_service.detect_anomalies(USER_ID)
 
     if anomalies:
@@ -221,11 +215,8 @@ with tab3:
 
     st.divider()
 
-    # =========================
-    # TOOL: get_expense
-    # =========================
+    # TOOL: get_expense (manual lookup)
     st.subheader("Lookup Expense by ID (get_expense tool)")
-
     expense_id_lookup = st.number_input(
         "Expense ID",
         min_value=1,
@@ -243,8 +234,9 @@ with tab3:
 
     st.caption(
         "This tab uses ExpenseService tools (summarize_expense, get_expense) "
-        "and AnalyticsService for advanced analysis (charts & anomaly detection)."
+        "and AnalyticsService for charts & anomaly detection."
     )
+
 
 # ----------------------------------------
 # TAB 4: AI ASSISTANT
@@ -256,13 +248,12 @@ with tab4:
         st.session_state.chat_history = []
 
     ai_client = st.session_state.ai_client
-    analytics_service = st.session_state.analytics_service
     budget_service = st.session_state.budget_service
     expense_service = st.session_state.expense_service
 
-    # Context for the AI (uses expense tool summary + budget status)
+    # Context for the AI (uses expense tool summary + budget status tool)
     context_data = {
-        "summary": expense_service.summarize_expense(USER_ID),  # ✅ uses tool via expense service
+        "summary": expense_service.summarize_expense(USER_ID),
         "budget_status": budget_service.get_budget_status(USER_ID),
     }
 
@@ -288,6 +279,7 @@ with tab4:
         if st.button("Clean Chat History"):
             st.session_state.chat_history = []
             st.rerun()
+
 
 # Footer
 st.divider()

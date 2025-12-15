@@ -4,6 +4,7 @@ tools/budget/set_budget.py - Define/Atualiza o limite de orçamento.
 import sqlite3
 from services import db_connector
 from typing import Optional
+from datetime import datetime
 
 def set_budget(db_file: str, user_id: int, category: str, amount_limit: float, 
                         start_date: str, end_date: str) -> Optional[int]:
