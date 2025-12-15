@@ -5,7 +5,7 @@ import sqlite3
 from services import db_connector
 from typing import Optional
 
-def upsert_budget_limit(db_file: str, user_id: int, category: str, amount_limit: float, 
+def set_budget(db_file: str, user_id: int, category: str, amount_limit: float, 
                         start_date: str, end_date: str) -> Optional[int]:
     """
     TOOL: set_budget. Atualiza ou insere (upsert) um orçamento.

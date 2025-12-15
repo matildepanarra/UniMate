@@ -5,7 +5,7 @@ import sqlite3
 import db_connector
 from typing import List, Dict
 
-def get_category_spending_breakdown(db_file: str, user_id: int) -> List[Dict]:
+def get_category_breakdown(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: get_category_breakdown. Calcula o gasto total por categoria.
     O Service calcula a percentagem.

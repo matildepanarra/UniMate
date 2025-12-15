@@ -5,7 +5,7 @@ import sqlite3
 from services import db_connector
 from typing import List, Dict
 
-def find_spending_anomalies(db_file: str, user_id: int) -> List[Dict]:
+def detect_anomalies(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: detect_anomalies. Identifica despesas que são significativamente maiores que a média (2x).
     """
