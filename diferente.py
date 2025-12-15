@@ -66,7 +66,7 @@ def process_ai_expense(text: str):
     """Calls the service to process text with the AI."""
     expense_service = st.session_state.expense_service
     expense_id = expense_service.add_expense_from_document(USER_ID, text)
-    if expense_id:
+    if expense_id: 
         return expense_service.get_expense(expense_id)
     return None
 

@@ -1,16 +1,12 @@
 """
 AI Service - Artificial Intelligence Engine for Personal Finance.
-Handles structured data extraction (documents/receipts), categorization, 
-forecasting, and conversational assistance via chat, powered by the Gemini API.
-"""
-"""
-AI Service - Artificial Intelligence Engine for Personal Finance.
 
 Responsibilities:
 - Centralize access to Gemini client
 - Expose AI capabilities as high-level methods
-- Delegate chat logic to ai_assistant_tool
+- Delegate chat logic to tools.ai_assistant.ai_assistant
 - Handle document ingestion (image / PDF)
+- Provide compatibility wrapper for ExpenseService.add_expense_from_document()
 """
 
 import os
@@ -26,8 +22,8 @@ try:
 except Exception:
     from utils.observability import observe
 
-# IMPORT DA TUA TOOL
-from tools import ai_assistant
+# ✅ IMPORT CORRETO: função dentro de tools/ai_assistant.py
+from tools.ai_assistant import ai_assistant as ai_assistant_fn
 
 
 # --------------------------------------------------
@@ -48,7 +44,7 @@ class DocumentIngestionResult(BaseModel):
     merchant: Optional[str] = Field(default=None)
     currency: Optional[str] = Field(default="EUR")
     total: Optional[float] = Field(default=None)
-    transactions: List[TransactionExtract]
+    transactions: List[TransactionExtract] = Field(default_factory=list)
 
 
 # --------------------------------------------------
@@ -67,11 +63,25 @@ class PromptLoader:
                 "You are a receipt/invoice parser for personal finance.\n"
                 "Extract merchant, currency, total and transactions.\n"
                 "Each transaction must include amount, description and date (YYYY-MM-DD).\n"
+                "Return ONLY JSON that matches the required schema.\n"
                 "Do not invent values.\n"
             )
             if kwargs.get("date_hint"):
                 base += f"\nDate hint: {kwargs['date_hint']}\n"
             return base
+
+        if name == "classify_expense_system":
+            amount = kwargs.get("amount")
+            description = kwargs.get("description")
+            categories_list = kwargs.get("categories_list", [])
+            return (
+                "You are a personal finance categorizer.\n"
+                "Choose EXACTLY one category from the provided list.\n"
+                "Return ONLY the category name (no extra text).\n\n"
+                f"Amount: {amount}\n"
+                f"Description: {description}\n"
+                f"Allowed categories: {categories_list}\n"
+            )
 
         return ""
 
@@ -97,53 +107,33 @@ class AIService:
             self.client = None
 
     # --------------------------------------------------
-    # CHAT / AI ASSISTANT  ✅ CHAMA A TOOL
+    # CHAT / AI ASSISTANT ✅ chama a função tool certa
     # --------------------------------------------------
     @observe()
     def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
-        """
-        Wrapper that delegates chat logic to ai_assistant_tool
-        """
-        return ai_assistant(
-            client=self.client,
-            model=self.model,
-            prompts=self.prompts,
-            user_question=user_question,
-            context_data=context_data,
+        return ai_assistant_fn(
+            self.client,
+            self.model,
+            self.prompts,
+            user_question,
+            context_data or {},
         )
 
     # --------------------------------------------------
     # DOCUMENT INGESTION (PDF / IMAGE)
     # --------------------------------------------------
     @observe()
-    def ingest_document(
-        self,
-        file_bytes: bytes,
-        mime_type: str,
-        date_hint: Optional[str] = None,
-    ) -> Dict:
-        """
-        Extract structured expense data from a receipt/invoice (PDF or image).
-        """
+    def ingest_document(self, file_bytes: bytes, mime_type: str, date_hint: Optional[str] = None) -> Dict:
         if not self.client:
             return {"merchant": None, "currency": "EUR", "total": None, "transactions": []}
 
-        system_instruction = self.prompts.format(
-            "document_ingestion_system",
-            date_hint=date_hint
-        )
+        system_instruction = self.prompts.format("document_ingestion_system", date_hint=date_hint)
 
         response = self.client.models.generate_content(
             model=self.model,
             contents=[
-                types.Part.from_text(
-                    text="Parse the attached document and return JSON matching the schema."
-                    ),
-
-                types.Part.from_bytes(
-                    data=file_bytes,
-                    mime_type=mime_type
-                ),
+                types.Part.from_text(text="Parse the attached document and return JSON matching the schema."),
+                types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -154,25 +144,22 @@ class AIService:
         )
 
         try:
-            data = json.loads(response.text)
+            data = json.loads(response.text or "{}")
         except json.JSONDecodeError:
             return {"merchant": None, "currency": "EUR", "total": None, "transactions": []}
 
-        # Normalização defensiva
         transactions = []
-        for t in data.get("transactions", []):
+        for t in data.get("transactions", []) or []:
             try:
-                amount = float(t.get("amount", 0))
+                amount = float(t.get("amount", 0) or 0)
             except Exception:
                 continue
 
-            desc = str(t.get("description", "")).strip()
-            date = str(t.get("date", "")).strip()
+            desc = str(t.get("description", "") or "").strip()
+            date = str(t.get("date", "") or "").strip()
 
             if amount > 0 and desc:
-                transactions.append(
-                    {"amount": amount, "description": desc, "date": date}
-                )
+                transactions.append({"amount": amount, "description": desc, "date": date})
 
         try:
             total = float(data.get("total")) if data.get("total") is not None else None
@@ -190,11 +177,7 @@ class AIService:
     # FUTURE SPENDING PREDICTION
     # --------------------------------------------------
     @observe()
-    def predict_future_spending(
-        self,
-        historical_data: str,
-        prediction_period: str = "next month"
-    ) -> Dict:
+    def predict_future_spending(self, historical_data: str, prediction_period: str = "next month") -> Dict:
         if not self.client:
             return {"predicted_amount": 0.0, "justification": "AI Offline."}
 
@@ -215,19 +198,20 @@ class AIService:
         )
 
         try:
-            data = json.loads(response.text)
+            data = json.loads(response.text or "{}")
         except json.JSONDecodeError:
             return {"predicted_amount": 0.0, "justification": "Prediction failed."}
 
         return {
-            "predicted_amount": float(data.get("predicted_amount", 0.0)),
-            "justification": str(data.get("justification", "")),
+            "predicted_amount": float(data.get("predicted_amount", 0.0) or 0.0),
+            "justification": str(data.get("justification", "") or ""),
         }
+
+    # --------------------------------------------------
+    # CLASSIFY EXPENSE
+    # --------------------------------------------------
     @observe()
     def classify_expense(self, amount: float, description: str, categories_list: List[str]) -> str:
-        """
-        Classifies a transaction into one category from categories_list.
-        """
         if not self.client:
             return "Others"
 
@@ -237,13 +221,45 @@ class AIService:
             description=description,
             categories_list=categories_list,
         )
+
+        content = (
+            f"Classify this transaction.\n"
+            f"Amount: {amount}\n"
+            f"Description: {description}\n"
+            f"Allowed categories: {categories_list}\n"
+            "Return only the category name."
+        )
+
         response = self.client.models.generate_content(
             model=self.model,
-            contents="Classify this transaction into the most appropriate category.",
+            contents=content,
             config=types.GenerateContentConfig(
                 temperature=0.0,
                 system_instruction=system_instruction,
             ),
         )
 
-        return (response.text or "").strip() or "Others"
+        result = (response.text or "").strip().split("\n")[0].strip()
+        return result if result in categories_list else "Others"
+
+    # --------------------------------------------------
+    # COMPAT: extract_document_data (para ExpenseService.add_expense_from_document)
+    # --------------------------------------------------
+    @observe()
+    def extract_document_data(self, document_text: str) -> dict:
+        instruction = (
+            "Extract ONE transaction from the text below and return ONLY valid JSON "
+            "with keys: amount (number), description (string), date (YYYY-MM-DD or empty string), "
+            "category (string or empty). No markdown, no explanation.\n\n"
+            f"TEXT:\n{document_text}"
+        )
+
+        result = self.ai_assistant(instruction, {})
+
+        if isinstance(result, dict):
+            return result
+
+        try:
+            return json.loads(result)
+        except Exception:
+            return {"amount": 0.0, "description": "", "date": "", "category": ""}
