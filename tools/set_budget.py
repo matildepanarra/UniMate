@@ -32,23 +32,23 @@ def set_budget(
         sql_update = """
         UPDATE budgets
         SET amount_limit = ?, end_date = ?, created_at = ?
-        WHERE user_id = ? AND category = ? AND start_date = ? AND end_date = ?
+        WHERE user_id = ? AND category = ? AND start_date = ?
         """
         cursor.execute(
             sql_update,
-            (amount_limit, end_date, created_at, user_id, category, start_date, end_date)
+            (amount_limit, end_date, created_at, user_id, category, start_date) # <--- REMOVIDO 'end_date' dos WHERE params
         )
 
         if cursor.rowcount > 0:
-            # Buscar o ID do registo atualizado
+            # Buscar o ID do registo atualizado (AQUI TAMBÉM DEVE SER MUDADO)
             cursor.execute(
                 """
                 SELECT id FROM budgets
-                WHERE user_id = ? AND category = ? AND start_date = ? AND end_date = ?
+                WHERE user_id = ? AND category = ? AND start_date = ? 
                 ORDER BY id DESC
                 LIMIT 1
-                """,
-                (user_id, category, start_date, end_date)
+                """, # <--- REMOVIDO "AND end_date = ?"
+                (user_id, category, start_date) # <--- REMOVIDO 'end_date' dos WHERE params
             )
             row = cursor.fetchone()
             conn.commit()

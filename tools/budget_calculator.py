@@ -29,7 +29,7 @@ def budget_calculator(db_file: str, user_id: int, start_date: str, end_date: str
         cursor = conn.cursor()
         
         # Executa a query
-        params = (user_id, start_date, end_date, user_id, start_date)
+        params = (start_date, end_date, user_id, start_date)
         cursor.execute(sql, params)
         
         # Retorna os resultados brutos (cabe ao Service calcular o 'remaining' e 'status')
