@@ -10,6 +10,7 @@ Responsibilities:
 """
 
 import os
+import re
 import json
 from typing import List, Dict, Optional
 
@@ -263,3 +264,82 @@ class AIService:
             return json.loads(result)
         except Exception:
             return {"amount": 0.0, "description": "", "date": "", "category": ""}
+    # ... o teu __init__ e resto do código
+
+    def generate_financial_advice(self, context: str) -> str:
+        """
+        Generates financial advice text.
+        - If OpenAI is configured (OPENAI_API_KEY), uses LLM.
+        - Otherwise falls back to a safe rule-based summary so the app never crashes.
+        """
+        if isinstance(context, (dict, list, tuple)):
+            context = json.dumps(context, ensure_ascii=False, indent=2, default=str)
+        else:
+            context = str(context)
+        # ---------- 1) Try LLM (OpenAI) ----------
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            try:
+                # Works with the modern OpenAI SDK
+                from openai import OpenAI  # type: ignore
+                client = OpenAI(api_key=api_key)
+
+                system_msg = (
+                    "You are a personal finance assistant. "
+                    "Provide concise, actionable advice based on the provided budget/expense context. "
+                    "Use bullets. Do not invent numbers. If context is insufficient, say what is missing."
+                )
+
+                resp = client.chat.completions.create(
+                    model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                    messages=[
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": context},
+                    ],
+                    temperature=0.4,
+                )
+                return (resp.choices[0].message.content or "").strip() or "No recommendation available."
+            except Exception as e:
+                # If LLM fails, do NOT crash the app — fall back
+                pass
+
+        # ---------- 2) Rule-based fallback (never crashes) ----------
+        # Heuristic: try to detect overspending patterns from text
+        lines = []
+        lines.append("Here’s a quick budget check based on what I can infer from your data:")
+
+        # Try to capture patterns like "Category: X" and "Spent: Y" "Limit: Z"
+        # (works if your context includes these words; if not, it still returns generic tips)
+        overspent = []
+        for m in re.finditer(r"Category\s*:\s*(.+?)\s*(?:\n|,).*?(?:Spent|spend)\s*[:€]?\s*([0-9]+(?:\.[0-9]+)?)"
+                             r".*?(?:Limit|budget)\s*[:€]?\s*([0-9]+(?:\.[0-9]+)?)",
+                             context, flags=re.IGNORECASE | re.DOTALL):
+            cat = m.group(1).strip()
+            spent = float(m.group(2))
+            limit = float(m.group(3))
+            if limit > 0 and spent > limit:
+                overspent.append((cat, spent, limit))
+
+        if overspent:
+            lines.append("")
+            lines.append("⚠️ Overspent categories:")
+            for cat, spent, limit in overspent[:5]:
+                diff = spent - limit
+                lines.append(f"- {cat}: over by €{diff:.2f} (spent €{spent:.2f} / limit €{limit:.2f})")
+            lines.append("")
+            lines.append("What to do next:")
+            lines.append("- Reduce discretionary spending in those categories for the rest of the month.")
+            lines.append("- Set a smaller weekly cap (divide the remaining budget by remaining weeks).")
+            lines.append("- If this is recurring, raise the limit only if it matches your real priorities.")
+        else:
+            lines.append("")
+            lines.append("I couldn’t clearly detect category limits vs spending from the context.")
+            lines.append("Suggestions (safe defaults):")
+            lines.append("- Set monthly limits per category (Food, Transport, Leisure, Bills).")
+            lines.append("- Review recurring subscriptions and cancel unused ones.")
+            lines.append("- Flag unusual spikes (2–3x your typical transaction size) for review.")
+
+        lines.append("")
+        lines.append("Tip: If you want more precise advice, include in the context: category limits, spent-to-date, and remaining days in month.")
+
+        return "\n".join(lines)
