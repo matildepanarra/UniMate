@@ -1,6 +1,8 @@
 import sqlite3
 import os
 from sqlite3 import Error
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
 DATABASE_NAME = "unimate_financial_data.db"
 DATABASE_FILE = "unimate_financial_data.db"
 def get_connection(db_file: str = DATABASE_FILE):
@@ -82,3 +84,53 @@ if __name__ == '__main__':
     if os.path.exists(DATABASE_FILE):
         print(f"\nNew file '{DATABASE_FILE}' created successfully in the DB.")
 
+def execute_select_query(
+    db_file: str,
+    sql: str,
+    params: Optional[Sequence[Any]] = None
+) -> List[Dict]:
+    """
+    Executa um SELECT e devolve uma lista de dicionários.
+    """
+    conn = None
+    try:
+        conn = get_connection(db_file)
+        cur = conn.cursor()
+        cur.execute(sql, tuple(params or ()))
+        rows = cur.fetchall()
+        return [dict(row) for row in rows]
+    except Error as e:
+        print(f"[DB] SELECT error: {e}\nSQL: {sql}\nParams: {params}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def execute_modify_query(
+    db_file: str,
+    sql: str,
+    params: Optional[Sequence[Any]] = None
+) -> int:
+    """
+    Executa INSERT/UPDATE/DELETE.
+    Devolve lastrowid (INSERT) ou rowcount (UPDATE/DELETE).
+    """
+    conn = None
+    try:
+        conn = get_connection(db_file)
+        cur = conn.cursor()
+        cur.execute(sql, tuple(params or ()))
+        conn.commit()
+
+        # Se foi INSERT, lastrowid costuma ser útil
+        if sql.strip().upper().startswith("INSERT"):
+            return cur.lastrowid
+
+        return cur.rowcount
+    except Error as e:
+        print(f"[DB] MODIFY error: {e}\nSQL: {sql}\nParams: {params}")
+        return -1
+    finally:
+        if conn:
+            conn.close()

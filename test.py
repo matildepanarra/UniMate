@@ -166,53 +166,135 @@ with tab2:
 # TAB 3: ANALYTICS (EXPENSE TOOLS + CHARTS)
 # ----------------------------------------
 with tab3:
-    st.header("Financial Analytics (Expense Tools)")
+    st.header("Financial Analytics")
 
-    expense_service = st.session_state.expense_service
-    analytics_service = st.session_state.analytics_service
+    import pandas as pd  # garante que existe aqui
+    from typing import Any
 
-    # --- AnalyticsService: summarize_expense ---
-    st.subheader("Expense Summary (AnalyticsService)")
-    summary = analytics_service.summarize_expense(USER_ID)
+    # --- Safely get services from session_state ---
+    expense_service = st.session_state.get("expense_service", None)
+    analytics_service = st.session_state.get("analytics_service", None)
+
+    if analytics_service is None:
+        st.error(
+            "analytics_service não está inicializado no st.session_state.\n\n"
+            "Garante que tens algo tipo:\n"
+            "st.session_state.analytics_service = AnalyticsService(DB_FILE)"
+        )
+        st.stop()
+
+    if expense_service is None:
+        st.warning(
+            "expense_service não está inicializado no st.session_state. "
+            "A parte de lookup por ID pode não funcionar."
+        )
+
+    # Helper: normaliza listas de resultados para DataFrame
+    def to_df(rows: Any) -> pd.DataFrame:
+        if rows is None:
+            return pd.DataFrame()
+        if isinstance(rows, pd.DataFrame):
+            return rows
+        if isinstance(rows, dict):
+            return pd.DataFrame([rows])
+        if isinstance(rows, list):
+            # lista de dicts -> ok
+            if len(rows) == 0:
+                return pd.DataFrame()
+            if isinstance(rows[0], dict):
+                return pd.DataFrame(rows)
+            # lista de tuples/rows -> tenta converter
+            try:
+                return pd.DataFrame([dict(r) for r in rows])
+            except Exception:
+                return pd.DataFrame(rows)
+        # fallback
+        try:
+            return pd.DataFrame([dict(rows)])
+        except Exception:
+            return pd.DataFrame()
+
+    # ----------------------------------------------------
+    # AnalyticsService: summarize_expense
+    # ----------------------------------------------------
+    st.subheader("Expense Summary")
+    try:
+        summary = expense_service.summarize_expense(USER_ID) or {}
+    except Exception as e:
+        st.error(f"Erro em expense_service.summarize_expense: {e}")
+        summary = {}
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Spent Lifetime", f"€ {summary.get('total_spent_lifetime', 0.0):.2f}")
-    col2.metric("Total Transactions", int(summary.get("transaction_count", 0)))
-    col3.metric("Average Value", f"€ {summary.get('avg_transaction_value', 0.0):.2f}")
+    col1.metric("Total Spent Lifetime", f"€ {float(summary.get('total_spent_lifetime', 0.0) or 0.0):.2f}")
+    col2.metric("Total Transactions", int(summary.get("transaction_count", 0) or 0))
+    col3.metric("Average Value", f"€ {float(summary.get('avg_transaction_value', 0.0) or 0.0):.2f}")
 
     st.divider()
 
-    # --- AnalyticsService: Category Breakdown chart ---
+    # ----------------------------------------------------
+    # AnalyticsService: Category Breakdown chart
+    # ----------------------------------------------------
     st.subheader("Distribution by Category")
-    breakdown = analytics_service.get_category_breakdown(USER_ID)
+    try:
+        breakdown = analytics_service.get_category_breakdown(USER_ID) or {}
+    except Exception as e:
+        st.error(f"Erro em analytics_service.get_category_breakdown: {e}")
+        breakdown = {}
 
-    total_lifetime = breakdown.get("total_spent_lifetime", 0.0)
-    if total_lifetime and total_lifetime > 0:
-        data_list = [
-            {"Category": cat, "Amount": float(data.get("total", 0.0))}
-            for cat, data in breakdown.items()
-            if cat != "total_spent_lifetime"
-        ]
-        df = pd.DataFrame(data_list).sort_values("Amount", ascending=False)
-        st.bar_chart(df, x="Category", y="Amount", use_container_width=True)
+    total_lifetime = float(breakdown.get("total_spent_lifetime", 0.0) or 0.0)
+
+    # breakdown esperado: { "Food": {"total":..., "percentage":...}, ..., "total_spent_lifetime": ... }
+    if total_lifetime > 0:
+        data_list = []
+        for cat, data in breakdown.items():
+            if cat == "total_spent_lifetime":
+                continue
+            if isinstance(data, dict):
+                data_list.append({"Category": cat, "Amount": float(data.get("total", 0.0) or 0.0)})
+            else:
+                # caso venha num formato estranho
+                data_list.append({"Category": str(cat), "Amount": 0.0})
+
+        df_cat = pd.DataFrame(data_list).sort_values("Amount", ascending=False)
+        if not df_cat.empty:
+            st.bar_chart(df_cat, x="Category", y="Amount", use_container_width=True)
+            st.dataframe(df_cat, use_container_width=True)
+        else:
+            st.info("No expenses available to generate category distribution.")
     else:
         st.info("No expenses available to generate category distribution.")
 
     st.divider()
 
-    # --- AnalyticsService: Anomaly Detection ---
+    # ----------------------------------------------------
+    # AnalyticsService: Anomaly Detection
+    # ----------------------------------------------------
     st.subheader("Anomaly Alert")
-    anomalies = analytics_service.detect_anomalies(USER_ID)
+
+    # Aqui cobrimos 2 cenários:
+    # 1) analytics_service.detect_anomalies(user_id) -> lista
+    # 2) detect_anomalies devolve raw rows (id, amount, vendor...) ou dicts já formatados
+    try:
+        anomalies = analytics_service.detect_anomalies(USER_ID) or []
+    except Exception as e:
+        st.error(f"Erro em analytics_service.detect_anomalies: {e}")
+        anomalies = []
 
     if anomalies:
-        st.warning(f"{len(anomalies)} anomalous expenses detected.")
-        st.dataframe(pd.DataFrame(anomalies), use_container_width=True)
+        df_anom = to_df(anomalies)
+        st.warning(f"{len(df_anom)} anomalous expenses detected." if not df_anom.empty else f"{len(anomalies)} anomalous expenses detected.")
+        if not df_anom.empty:
+            st.dataframe(df_anom, use_container_width=True)
+        else:
+            st.json(anomalies)
     else:
         st.success("No anomalous expenses detected.")
 
     st.divider()
 
-    # --- ExpenseService tool: get_expense (manual lookup) ---
+    # ----------------------------------------------------
+    # ExpenseService tool: get_expense (manual lookup)
+    # ----------------------------------------------------
     st.subheader("Lookup Expense by ID")
     expense_id_lookup = st.number_input(
         "Expense ID",
@@ -222,18 +304,33 @@ with tab3:
     )
 
     if st.button("Fetch Expense", key="fetch_expense_tab3"):
-        try:
-            # Ajusta esta assinatura se o teu get_expense NÃO pedir USER_ID
-            expense = expense_service.get_expense(USER_ID, int(expense_id_lookup))
-        except TypeError:
-            # fallback caso a tua assinatura seja get_expense(expense_id)
-            expense = expense_service.get_expense(int(expense_id_lookup))
-
-        if expense:
-            st.success("Expense found:")
-            st.json(expense)
+        if expense_service is None:
+            st.error("expense_service não está disponível no session_state.")
         else:
-            st.warning("No expense found with that ID.")
+            expense = None
+            # tenta assinaturas comuns, sem rebentar
+            try:
+                expense = expense_service.get_expense(USER_ID, int(expense_id_lookup))
+            except TypeError:
+                try:
+                    expense = expense_service.get_expense(int(expense_id_lookup))
+                except Exception as e:
+                    st.error(f"Erro em expense_service.get_expense: {e}")
+            except Exception as e:
+                st.error(f"Erro em expense_service.get_expense: {e}")
+
+            if expense:
+                st.success("Expense found:")
+                # normaliza para json/dict quando possível
+                if isinstance(expense, dict):
+                    st.json(expense)
+                else:
+                    try:
+                        st.json(dict(expense))
+                    except Exception:
+                        st.write(expense)
+            else:
+                st.warning("No expense found with that ID.")
 
     st.caption(
         "This tab uses AnalyticsService (summarize_expense, get_category_breakdown, detect_anomalies) "
