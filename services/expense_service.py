@@ -24,7 +24,7 @@ class ExpenseService:
     def __init__(self, db_file: str):
         self.db_file = db_file
         self.ai_client = AIService()
-        self.valid_categories = ["Grocery", "Transport", "Restaurant", "Leisure", "Home", "Others"]
+        self.valid_categories = ["Grocery", "Transport", "Restaurant", "Leisure", "Home", "Others", "Party", "University","Health"]
 
     # -------------------------
     # TOOL WRAPPERS

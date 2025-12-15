@@ -106,6 +106,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["💰 Expenses (AI)", "📊 Budgets", "📈 An
 # ----------------------------------------
 with tab1:
     st.header("Expense Tracking (AI)")
+
     ai_input = st.text_area(
         "Transaction Text:",
         height=150,
