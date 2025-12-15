@@ -3,140 +3,230 @@ AI Service - Artificial Intelligence Engine for Personal Finance.
 Handles structured data extraction (documents/receipts), categorization, 
 forecasting, and conversational assistance via chat, powered by the Gemini API.
 """
+"""
+AI Service - Artificial Intelligence Engine for Personal Finance.
+
+Responsibilities:
+- Centralize access to Gemini client
+- Expose AI capabilities as high-level methods
+- Delegate chat logic to ai_assistant_tool
+- Handle document ingestion (image / PDF)
+"""
+
 import os
 import json
 from typing import List, Dict, Optional
+
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+
 try:
-    from langfuse import observe  
+    from langfuse import observe
 except Exception:
     from utils.observability import observe
 
-# ----------------------------
-# Schemas (Pydantic) to response_schema
-# ----------------------------
+# IMPORT DA TUA TOOL
+from tools import ai_assistant
+
+
+# --------------------------------------------------
+# Schemas
+# --------------------------------------------------
 class TransactionExtract(BaseModel):
     amount: float = Field(description="Transaction amount")
-    description: str = Field(description="Merchant name or transaction summary")
+    description: str = Field(description="Merchant or transaction summary")
     date: str = Field(description="Transaction date in YYYY-MM-DD format")
 
 
 class SpendingPrediction(BaseModel):
-    predicted_amount: float = Field(description="Total Spend amount predicted")
-    justification: str = Field(description="Brief explanation of the prediction")
+    predicted_amount: float = Field(description="Total spend predicted")
+    justification: str = Field(description="Explanation of the prediction")
 
-# ----------------------------
-# Prompt Loader (Simulated)
-# ----------------------------
+
+class DocumentIngestionResult(BaseModel):
+    merchant: Optional[str] = Field(default=None)
+    currency: Optional[str] = Field(default="EUR")
+    total: Optional[float] = Field(default=None)
+    transactions: List[TransactionExtract]
+
+
+# --------------------------------------------------
+# Prompt Loader
+# --------------------------------------------------
 class PromptLoader:
-    """Simulation of a loader of prompts for the system."""
-    def format(self, name, **kwargs):
-        if name == "extract_transaction_system":
+    def format(self, name: str, **kwargs) -> str:
+        if name == "ai_assistant_system":
             return (
-                "You are a transaction data extractor. "
-                "Analize the text and extract Amount (float), Description and Date (YYYY-MM-DD). "
-                "If the date is not explicit, infer the most likely one."
+                "You are a financial AI assistant. "
+                "Answer questions clearly and practically using the provided data."
             )
-        elif name == "classify_expense_system":
-            return (
-                "You are an expense classifier. "
-                f"Classify the transaction (Description: '{kwargs.get('description')}', "
-                f"Amount: {kwargs.get('amount')}) into a single category from the list: "
-                f"{kwargs.get('categories_list')}."
-                "Respond only with the exact category name."
+
+        if name == "document_ingestion_system":
+            base = (
+                "You are a receipt/invoice parser for personal finance.\n"
+                "Extract merchant, currency, total and transactions.\n"
+                "Each transaction must include amount, description and date (YYYY-MM-DD).\n"
+                "Do not invent values.\n"
             )
-        elif name == "financial_advice_system":
-            return (
-                "You are a smart financial advisor. "
-                f"Analyze the user's spending summary, budgets, and predictions "
-                f"({kwargs.get('summary')}) and provide an actionable and personalized "
-                "advice to optimize finances."
-            )
-        elif name == "ai_assistant_system":
-            return (
-                "You are an AI assistant focused on finance. "
-                "Answer user questions about expenses and budgets based on the provided context. "
-                "Be direct and practical."
-            )
+            if kwargs.get("date_hint"):
+                base += f"\nDate hint: {kwargs['date_hint']}\n"
+            return base
+
         return ""
 
 
-# ----------------------------
-# AI Service Class
-# ----------------------------
+# --------------------------------------------------
+# AI Service
+# --------------------------------------------------
 class AIService:
-    """Implementation of all the AI tools (tools)."""
-
     def __init__(self, model: str = "gemini-2.5-flash"):
-        """
-        Initialize the AI service.
-        Requires GOOGLE_API_KEY in the environment (.env).
-        """
         self.model = model
         self.prompts = PromptLoader()
 
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            print("Alert: GOOGLE_API_KEY not found. AI will be offline.")
+            print("GOOGLE_API_KEY not found. AI disabled.")
             self.client = None
             return
 
         try:
             self.client = genai.Client(api_key=api_key)
         except Exception as e:
-            print(
-                "Alert: Failed to initialize the Gemini client. "
-                f"Error: {e}"
-            )
+            print(f"Failed to initialize Gemini client: {e}")
             self.client = None
 
-    # ----------------------------------------------------
-    # TOOL: extract_document_data
-    # ----------------------------------------------------
+    # --------------------------------------------------
+    # CHAT / AI ASSISTANT  ✅ CHAMA A TOOL
+    # --------------------------------------------------
     @observe()
-    def extract_document_data(self, document_text: str) -> dict:
+    def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
         """
-        Extract structured information (Amount, Description, Date) from a free text.
-        Used by expense_service.
+        Wrapper that delegates chat logic to ai_assistant_tool
+        """
+        return ai_assistant(
+            client=self.client,
+            model=self.model,
+            prompts=self.prompts,
+            user_question=user_question,
+            context_data=context_data,
+        )
+
+    # --------------------------------------------------
+    # DOCUMENT INGESTION (PDF / IMAGE)
+    # --------------------------------------------------
+    @observe()
+    def ingest_document(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        date_hint: Optional[str] = None,
+    ) -> Dict:
+        """
+        Extract structured expense data from a receipt/invoice (PDF or image).
         """
         if not self.client:
-            return {"amount": 0.0, "description": "AI Offline", "date": ""}
+            return {"merchant": None, "currency": "EUR", "total": None, "transactions": []}
 
-        system_instruction = self.prompts.format("extract_transaction_system")
+        system_instruction = self.prompts.format(
+            "document_ingestion_system",
+            date_hint=date_hint
+        )
 
         response = self.client.models.generate_content(
             model=self.model,
-            contents=document_text,
+            contents=[
+                types.Part.from_text(
+                    text="Parse the attached document and return JSON matching the schema."
+                    ),
+
+                types.Part.from_bytes(
+                    data=file_bytes,
+                    mime_type=mime_type
+                ),
+            ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=TransactionExtract,  
+                response_schema=DocumentIngestionResult,
                 system_instruction=system_instruction,
                 temperature=0.0,
-            )
+            ),
         )
 
-        # google-genai gets back JSON in response.text when response_mime_type="application/json"
         try:
             data = json.loads(response.text)
         except json.JSONDecodeError:
-            return {"amount": 0.0, "description": "Erro de extração", "date": ""}
+            return {"merchant": None, "currency": "EUR", "total": None, "transactions": []}
+
+        # Normalização defensiva
+        transactions = []
+        for t in data.get("transactions", []):
+            try:
+                amount = float(t.get("amount", 0))
+            except Exception:
+                continue
+
+            desc = str(t.get("description", "")).strip()
+            date = str(t.get("date", "")).strip()
+
+            if amount > 0 and desc:
+                transactions.append(
+                    {"amount": amount, "description": desc, "date": date}
+                )
+
+        try:
+            total = float(data.get("total")) if data.get("total") is not None else None
+        except Exception:
+            total = None
 
         return {
-            "amount": float(data.get("amount", 0.0) or 0.0),
-            "description": str(data.get("description", "") or ""),
-            "date": str(data.get("date", "") or ""),
+            "merchant": data.get("merchant"),
+            "currency": data.get("currency", "EUR"),
+            "total": total,
+            "transactions": transactions,
         }
 
-    # ----------------------------------------------------
-    # TOOL: classify_expense
-    # ----------------------------------------------------
+    # --------------------------------------------------
+    # FUTURE SPENDING PREDICTION
+    # --------------------------------------------------
+    @observe()
+    def predict_future_spending(
+        self,
+        historical_data: str,
+        prediction_period: str = "next month"
+    ) -> Dict:
+        if not self.client:
+            return {"predicted_amount": 0.0, "justification": "AI Offline."}
+
+        system_instruction = (
+            "You are a financial analyst. "
+            f"Predict spending for {prediction_period} based on the data."
+        )
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=f"Historical data (JSON): {historical_data}",
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=SpendingPrediction,
+                system_instruction=system_instruction,
+                temperature=0.5,
+            ),
+        )
+
+        try:
+            data = json.loads(response.text)
+        except json.JSONDecodeError:
+            return {"predicted_amount": 0.0, "justification": "Prediction failed."}
+
+        return {
+            "predicted_amount": float(data.get("predicted_amount", 0.0)),
+            "justification": str(data.get("justification", "")),
+        }
     @observe()
     def classify_expense(self, amount: float, description: str, categories_list: List[str]) -> str:
         """
-        Classifies a transaction into one of the categories.
-        Used internally by ExpenseService.
+        Classifies a transaction into one category from categories_list.
         """
         if not self.client:
             return "Others"
@@ -145,114 +235,15 @@ class AIService:
             "classify_expense_system",
             amount=amount,
             description=description,
-            categories_list=categories_list
+            categories_list=categories_list,
         )
-
         response = self.client.models.generate_content(
             model=self.model,
             contents="Classify this transaction into the most appropriate category.",
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                system_instruction=system_instruction
-            )
+                system_instruction=system_instruction,
+            ),
         )
 
-        return (response.text or "").strip()
-
-    # ----------------------------------------------------
-    # TOOL: generate_financial_advice
-    # ----------------------------------------------------
-    @observe()
-    def generate_financial_advice(self, user_financial_summary: Dict) -> str:
-        """
-        Generates personalized advice based on a financial summary.
-        Used by budget_service.analyze_budget.
-        """
-        if not self.client:
-            return "AI service unavailable for advice."
-
-        summary_str = json.dumps(user_financial_summary, ensure_ascii=False)
-
-        system_instruction = self.prompts.format("financial_advice_system", summary=summary_str)
-
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents="Based on my financial performance and goals, what is your best advice for me?",
-            config=types.GenerateContentConfig(
-                temperature=0.7,
-                system_instruction=system_instruction
-            )
-        )
-
-        return response.text or ""
-
-    # ----------------------------------------------------
-    # TOOL: ai_assistant
-    # ----------------------------------------------------
-    @observe()
-    def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
-        """
-        Answer questions from the user about finances, using contextual data.
-        """
-        if not self.client:
-            return "I assistant unavailable."
-
-        context_str = json.dumps(context_data or {}, ensure_ascii=False)
-        system_instruction = self.prompts.format("ai_assistant_system")
-
-        user_prompt = (
-            f"Question: {user_question}\n\n"
-            f"Context Data (Expenses/Budgets): {context_str}"
-        )
-
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3,
-                system_instruction=system_instruction
-            )
-        )
-
-        return response.text or ""
-
-    # ----------------------------------------------------
-    # TOOL: predict_future_spending
-    # ----------------------------------------------------
-    @observe()
-    def predict_future_spending(self, historical_data: str, prediction_period: str = "next month") -> dict:
-        """
-        Predict future spending based on historical data.
-        Used by budget_service.analyze_budget.
-        """
-        if not self.client:
-            return {"predicted_amount": 0.0, "justification": "AI Offline."}
-
-        system_instruction = (
-            "You are a financial analyst. Analyze the provided historical spending data "
-            f"and predict the likely total spending for {prediction_period}. "
-            "Return a JSON object with the prediction and a brief justification."
-        )
-
-        user_prompt = f"historical_data (JSON): {historical_data}"
-
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=SpendingPrediction, 
-                temperature=0.5,
-                system_instruction=system_instruction
-            )
-        )
-
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError:
-            return {"predicted_amount": 0.0, "justification": "Error processing prediction."}
-
-        return {
-            "predicted_amount": float(data.get("predicted_amount", 0.0) or 0.0),
-            "justification": str(data.get("justification", "") or ""),
-        }
+        return (response.text or "").strip() or "Others"
