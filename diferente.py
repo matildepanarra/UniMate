@@ -143,8 +143,23 @@ with st.sidebar:
 
 
 # Main content area - Tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💰 Expenses", "📊 Budgets", "📈 Analytics", "🤖 AI Assistant", "👤 Profile"])
+tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(["Welcome!","💰 Expenses", "📊 Budgets", "📈 Analytics", "🤖 AI Assistant", "👤 Profile"])
 
+
+#Tab0 : WELCOME
+with tab0:
+    st.header("Welcome to UniMate!")
+    st.markdown("""
+    UniMate is your AI-powered financial assistant that helps you track expenses, manage budgets, and gain insights into your spending habits.
+
+    **Features:**
+    - **Expense Tracking:** Easily log your expenses using AI-powered text processing or document ingestion.
+    - **Budget Management:** Set and monitor budgets for different categories.
+    - **Financial Analytics:** Visualize your spending patterns and detect anomalies.
+    - **AI Assistant:** Chat with an AI to get insights about your finances.
+
+    Navigate through the tabs to explore each feature!
+    """)
 
 # ----------------------------------------
 # TAB 1: EXPENSES (AI-Driven) + DOCUMENT INGESTION
