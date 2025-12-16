@@ -131,7 +131,7 @@ with st.sidebar:
     """)
     st.divider()
 
-    st.subheader("Configuração")
+    st.subheader("Configurations")
     if st.session_state.services_ready:
         st.success("Services Loaded")
         if st.session_state.ai_client.client:
@@ -143,20 +143,20 @@ with st.sidebar:
 
 
 # Main content area - Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["💰 Expenses (AI)", "📊 Budgets", "📈 Analytics", "🤖 AI Assistant"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💰 Expenses", "📊 Budgets", "📈 Analytics", "🤖 AI Assistant", "👤 Profile"])
 
 
 # ----------------------------------------
 # TAB 1: EXPENSES (AI-Driven) + DOCUMENT INGESTION
 # ----------------------------------------
 with tab1:
-    st.header("Expense Tracking (AI)")
+    st.header("Expense Tracking")
 
-    st.subheader("A) Paste Text")
+    st.subheader("Insert Information:")
     ai_input = st.text_area(
         "Transaction Text:",
         height=150,
-        placeholder="Paste the receipt or statement text...",
+        placeholder="Paste the receipt or statement text about expense...",
         key="ai_input_tab1",
     )
 
@@ -175,7 +175,7 @@ with tab1:
 
     st.divider()
 
-    st.subheader("B) Document Ingestion (PDF / Image)")
+    st.subheader("Document Ingestion:")
     uploaded = st.file_uploader(
         "Upload receipt/invoice (PDF, JPG, PNG):",
         type=["pdf", "jpg", "jpeg", "png"],
@@ -208,7 +208,7 @@ with tab2:
     budget_service = st.session_state.budget_service
     expense_service = st.session_state.expense_service
 
-    st.subheader("1. Set Monthly Limit")
+    st.subheader("Set Monthly Limit")
     categories = expense_service.valid_categories
 
     col1, col2 = st.columns(2)
@@ -221,9 +221,8 @@ with tab2:
 
     st.divider()
 
-    st.subheader("2. Current Status and AI Analysis")
+    st.subheader("Current Status and Generate AI Analysis of Budget")
     status_report = budget_service.get_budget_status(USER_ID)
-
     if status_report:
         st.dataframe(pd.DataFrame(status_report), use_container_width=True)
 
@@ -234,6 +233,26 @@ with tab2:
             st.write(analysis_result.get('recommendation', 'No recommendation could be generated.'))
     else:
         st.info("No active budget found.")
+
+    # Adicionar um botão de confirmação, que é mais seguro
+    confirm_clear = st.button(
+        "🗑️ Clear All Budgets", 
+        type="secondary", 
+        key="clear_budgets_btn_tab2"
+    )
+
+    if confirm_clear:
+        # Ação de limpeza
+        rows_deleted = budget_service.clear_all_budgets(USER_ID)
+        
+        if rows_deleted > 0:
+            st.success(f"✅ {rows_deleted} orçamentos eliminados com sucesso!")
+        else:
+            st.info("Nenhum orçamento para eliminar ou ocorreu um erro.")
+            
+        # Re-executar a aplicação para atualizar a tabela de status imediatamente
+        st.rerun()
+    
 
 
 # ----------------------------------------
@@ -376,10 +395,6 @@ with tab3:
             else:
                 st.warning("No expense found with that ID.")
 
-    st.caption(
-        "This tab uses AnalyticsService (summarize_expense, get_category_breakdown, detect_anomalies) "
-        "and ExpenseService (get_expense)."
-    )
 
 
 # ----------------------------------------
@@ -423,6 +438,57 @@ with tab4:
             st.session_state.chat_history = []
             st.rerun()
 
+# ----------------------------------------
+# TAB 5: USER/PROFILE
+# ----------------------------------------
+with tab5:
+    st.header("User Profile")
+
+    # Acedemos à DB_FILE e ao USER_ID (1) definidos no início do ficheiro.
+    try:
+        # Usamos a função de conexão do db_connector.py
+        conn = db_connector.create_connection(DB_FILE)
+        
+        # Consultamos as colunas id, name, email, e created_at
+        user_data_row = conn.execute(
+            "SELECT id, name, email, created_at FROM users WHERE id = ?",
+            (USER_ID,)
+        ).fetchone() # Pega o primeiro resultado (deve ser único)
+        
+        conn.close()
+
+        if user_data_row:
+            # Acessamos por nome da coluna (já que conn.row_factory = sqlite3.Row)
+            user_info = {
+                "ID": user_data_row["id"],
+                "Name": user_data_row["name"],
+                "Email": user_data_row["email"],
+                "Created At": user_data_row["created_at"]
+            }
+
+            st.subheader(f"Welcome, {user_info['Name']}!")
+            st.markdown("---")
+            
+            # Exibe as informações principais
+            col_id, col_email, col_date = st.columns(3)
+            col_id.metric("User ID", user_info['ID'])
+            col_email.metric("Email Address", user_info['Email'])
+            
+            # Formatação simples da data
+            date_part = user_info['Created At'].split('T')[0]
+            col_date.metric("Member Since", date_part) 
+
+            st.markdown("---")
+            
+            st.subheader("Raw User Data (Database Record)")
+            st.json(user_info)
+
+        else:
+            st.warning(f"User with ID {USER_ID} not found in the database. Check if the initialization block inserted user ID 1.")
+            
+    except Exception as e:
+        st.error(f"Error accessing user data: {e}")
+        st.caption("Ensure 'db_connector.py' and 'diferente.py' are in the same directory.")
 
 # Footer
 st.divider()

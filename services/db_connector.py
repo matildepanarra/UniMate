@@ -134,3 +134,13 @@ def execute_modify_query(
     finally:
         if conn:
             conn.close()
+
+
+# --- Adicionar ao seu db_connector.py ---
+def delete_all_budgets_for_user(db_file: str, user_id: int) -> int:
+    """
+    Elimina todos os registos de orçamento para um user_id específico.
+    Devolve o número de linhas eliminadas.
+    """
+    sql = "DELETE FROM budgets WHERE user_id = ?"
+    return execute_modify_query(db_file, sql, (user_id,))

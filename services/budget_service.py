@@ -183,3 +183,18 @@ class BudgetService:
             "prediction": prediction_result,
             "recommendation": recommendation_text,
         }
+    
+    @observe()
+    def clear_all_budgets(self, user_id: int) -> int:
+        """
+        Elimina todos os orçamentos definidos por um utilizador.
+        """
+        try:
+            rows_deleted = db_connector.delete_all_budgets_for_user(
+                db_file=self.db_file,
+                user_id=user_id,
+            )
+            return rows_deleted
+        except sqlite3.Error as e:
+            print(f"Error clearing budgets: {e}")
+            return 0
