@@ -19,7 +19,6 @@ from utils.tracing import init_tracing
 # Loads environment variables
 load_dotenv()
 
-# ✅ Works whether your db_connector exposes DATABASE_NAME or DATABASE_FILE
 DB_FILE = getattr(db_connector, "DATABASE_NAME", getattr(db_connector, "DATABASE_FILE", "unimate_financial_data.db"))
 USER_ID = 1
 
@@ -52,7 +51,7 @@ if "services_ready" not in st.session_state:
         st.session_state.budget_service = BudgetService(db_file=DB_FILE)
         st.session_state.analytics_service = AnalyticsService(db_file=DB_FILE)
 
-        st.session_state.ai_client = AIService()  # ✅ AIService uses ai_assistant_tool internally
+        st.session_state.ai_client = AIService() 
         st.session_state.services_ready = True
 
     except Exception as e:
@@ -71,7 +70,7 @@ def process_ai_expense(text: str):
     return None
 
 
-# --- ORCHESTRATION: DOCUMENT INGESTION (PDF/IMAGE) ---
+# --- ORCHESTRATION: DOCUMENT INGESTION ---
 def process_ai_document(file_bytes: bytes, mime_type: str):
     """
     Uses AIService.ingest_document() and saves each extracted transaction using ExpenseService.add_expense().
