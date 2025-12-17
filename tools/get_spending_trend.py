@@ -1,5 +1,5 @@
 """
-tools/analytics/get_spending_trends.py - Calcula o gasto agregado mensal.
+tools/analytics/get_spending_trend.py - Calcula o gasto agregado mensal.
 """
 from typing import Dict, List
 from services import db_connector

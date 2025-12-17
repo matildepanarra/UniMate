@@ -4,15 +4,15 @@ AI Service - Artificial Intelligence Engine for Personal Finance.
 Responsibilities:
 - Centralize access to Gemini client
 - Expose AI capabilities as high-level methods
-- Delegate chat logic to tools.ai_assistant.ai_assistant
 - Handle document ingestion (image / PDF)
-- Provide compatibility wrapper for ExpenseService.add_expense_from_document()
+- Classify expenses
+- Tool-calling orchestration using local Python tools (SQLite)
 """
 
 import os
 import re
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from google import genai
 from google.genai import types
@@ -23,8 +23,8 @@ try:
 except Exception:
     from utils.observability import observe
 
-# ✅ IMPORT CORRETO: função dentro de tools/ai_assistant.py
-from tools.ai_assistant import ai_assistant as ai_assistant_fn
+from ai.tool_schemas import TOOLS
+from ai.tool_router import execute_tool
 
 
 # --------------------------------------------------
@@ -108,17 +108,200 @@ class AIService:
             self.client = None
 
     # --------------------------------------------------
-    # CHAT / AI ASSISTANT ✅ chama a função tool certa
+    # BASIC CHAT (no tools)
     # --------------------------------------------------
     @observe()
     def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
-        return ai_assistant_fn(
-            self.client,
-            self.model,
-            self.prompts,
-            user_question,
-            context_data or {},
+        if not self.client:
+            return "AI assistant unavailable. Please check the API credentials."
+
+        context_str = json.dumps(context_data or {}, ensure_ascii=False)
+        system_instruction = self.prompts.format("ai_assistant_system")
+
+        user_prompt = (
+            f"User Question: {user_question}\n"
+            f"Context Data (Expenses/Budgets): {context_str}\n\n"
+            "Please answer concisely and usefully, referencing the provided data."
         )
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                system_instruction=system_instruction,
+            ),
+        )
+        return response.text or ""
+
+    # --------------------------------------------------
+    # TOOL CALLING (JSON-based: works even if native function calling is not enabled)
+    # --------------------------------------------------
+    @observe()
+    def chat_with_tools(self, user_text: str, tools: Optional[list] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Returns:
+          {
+            "text": str | None,
+            "tool_calls": [ {"name": str, "arguments": dict}, ... ]
+          }
+
+        IMPORTANT:
+        - This implementation forces the model to output JSON (tool_calls) when needed.
+        - It does NOT rely on native Gemini function calling support.
+        """
+        if not self.client:
+            return {"text": "AI offline.", "tool_calls": []}
+
+        tools = tools or TOOLS
+
+        # We show the tool names + their required params to help the model produce correct calls.
+        tool_catalog = []
+        for t in tools:
+            fn = (t or {}).get("function") or {}
+            params = (fn.get("parameters") or {})
+            tool_catalog.append({
+                "name": fn.get("name"),
+                "description": fn.get("description", ""),
+                "required": params.get("required", []),
+                "properties": list((params.get("properties") or {}).keys())
+            })
+
+        system_instruction = (
+            "You are an assistant for a personal finance app.\n"
+            "You may either answer normally OR request tool execution.\n\n"
+            "If tool execution is needed, output ONLY valid JSON with this shape:\n"
+            "{\n"
+            '  "tool_calls": [\n'
+            '    {"name": "tool_name", "arguments": { ... }}\n'
+            "  ]\n"
+            "}\n\n"
+            "If no tool is needed, output ONLY valid JSON with this shape:\n"
+            '{ "text": "your answer here" }\n\n'
+            "Rules:\n"
+            "- Use ONLY tools from the catalog.\n"
+            "- Be strict with types.\n"
+            "- transaction_date must be YYYY-MM-DD.\n"
+            "- ALWAYS include db_file in tool arguments (required).\n"
+        )
+
+        # give user_id hint (helps the model)
+        if user_id is not None:
+            system_instruction += f"\nUser ID for tool calls: {int(user_id)}\n"
+
+        payload = {
+            "user_text": user_text,
+            "tool_catalog": tool_catalog
+        }
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=json.dumps(payload, ensure_ascii=False),
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+            ),
+        )
+
+        raw = (response.text or "").strip()
+
+        try:
+            data = json.loads(raw)
+        except Exception:
+            # fallback: just answer
+            return {"text": self.ai_assistant(user_text, {}), "tool_calls": []}
+
+        tool_calls = data.get("tool_calls") or []
+        if tool_calls:
+            # normalize tool calls
+            normalized = []
+            for tc in tool_calls:
+                name = tc.get("name")
+                args = tc.get("arguments") or {}
+                if name:
+                    normalized.append({"name": name, "arguments": dict(args)})
+            return {"text": None, "tool_calls": normalized}
+
+        txt = data.get("text")
+        return {"text": str(txt) if txt is not None else "", "tool_calls": []}
+
+    @observe()
+    def finalize_with_tool_results(self, user_text: str, tool_calls: list, tool_results: list) -> str:
+        """
+        Produces the final assistant response AFTER tools ran.
+        """
+        if not self.client:
+            return "Done."
+
+        system_instruction = (
+            "You are a finance assistant.\n"
+            "You receive tool calls and tool execution results.\n"
+            "Write a clear final message to the user.\n"
+            "If a tool failed (ok=false or result is null/None/-1), explain briefly and suggest next step.\n"
+            "Do not output JSON. Output normal text.\n"
+        )
+
+        payload = {
+            "user_text": user_text,
+            "tool_calls": tool_calls,
+            "tool_results": tool_results,
+        }
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=json.dumps(payload, ensure_ascii=False),
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                system_instruction=system_instruction,
+            ),
+        )
+        return response.text or "Done."
+
+    @observe()
+    def run_tool_calling_flow(self, user_text: str, db_file: str, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Full flow:
+          - model decides -> tool calls OR text
+          - execute tool calls locally
+          - finalize response
+
+        Returns:
+          { "answer": str, "db_updated": bool, "tool_results": list }
+        """
+        first = self.chat_with_tools(user_text, tools=TOOLS, user_id=user_id)
+        tool_calls = first.get("tool_calls") or []
+
+        if not tool_calls:
+            return {"answer": first.get("text") or "", "db_updated": False, "tool_results": []}
+
+        tool_results = []
+        db_updated = False
+
+        for tc in tool_calls:
+            name = tc.get("name")
+            args = tc.get("arguments") or {}
+
+            # Guarantee db_file exists (your schema requires it)
+            args["db_file"] = db_file
+
+            try:
+                result = execute_tool(name, args)
+                ok = True
+            except Exception as e:
+                result = None
+                ok = False
+                tool_results.append({"name": name, "ok": ok, "error": str(e), "args": args})
+                continue
+
+            tool_results.append({"name": name, "ok": ok, "result": result, "args": args})
+
+            # crude: which tools write to DB
+            if name in {"add_expense", "set_budget"} and result not in (None, -1):
+                db_updated = True
+
+        final_text = self.finalize_with_tool_results(user_text, tool_calls=tool_calls, tool_results=tool_results)
+        return {"answer": final_text, "db_updated": db_updated, "tool_results": tool_results}
 
     # --------------------------------------------------
     # DOCUMENT INGESTION (PDF / IMAGE)
@@ -157,10 +340,10 @@ class AIService:
                 continue
 
             desc = str(t.get("description", "") or "").strip()
-            date = str(t.get("date", "") or "").strip()
+            dt = str(t.get("date", "") or "").strip()
 
             if amount > 0 and desc:
-                transactions.append({"amount": amount, "description": desc, "date": date})
+                transactions.append({"amount": amount, "description": desc, "date": dt})
 
         try:
             total = float(data.get("total")) if data.get("total") is not None else None
@@ -257,30 +440,23 @@ class AIService:
 
         result = self.ai_assistant(instruction, {})
 
-        if isinstance(result, dict):
-            return result
-
         try:
             return json.loads(result)
         except Exception:
             return {"amount": 0.0, "description": "", "date": "", "category": ""}
-    # ... o teu __init__ e resto do código
 
+    # --------------------------------------------------
+    # Advice (OpenAI optional fallback kept)
+    # --------------------------------------------------
     def generate_financial_advice(self, context: str) -> str:
-        """
-        Generates financial advice text.
-        - If OpenAI is configured (OPENAI_API_KEY), uses LLM.
-        - Otherwise falls back to a safe rule-based summary so the app never crashes.
-        """
         if isinstance(context, (dict, list, tuple)):
             context = json.dumps(context, ensure_ascii=False, indent=2, default=str)
         else:
             context = str(context)
-        # ---------- 1) Try LLM (OpenAI) ----------
+
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
             try:
-                # Works with the modern OpenAI SDK
                 from openai import OpenAI  # type: ignore
                 client = OpenAI(api_key=api_key)
 
@@ -299,21 +475,19 @@ class AIService:
                     temperature=0.4,
                 )
                 return (resp.choices[0].message.content or "").strip() or "No recommendation available."
-            except Exception as e:
-                # If LLM fails, do NOT crash the app — fall back
+            except Exception:
                 pass
 
-        # ---------- 2) Rule-based fallback (never crashes) ----------
-        # Heuristic: try to detect overspending patterns from text
         lines = []
         lines.append("Here’s a quick budget check based on what I can infer from your data:")
 
-        # Try to capture patterns like "Category: X" and "Spent: Y" "Limit: Z"
-        # (works if your context includes these words; if not, it still returns generic tips)
         overspent = []
-        for m in re.finditer(r"Category\s*:\s*(.+?)\s*(?:\n|,).*?(?:Spent|spend)\s*[:€]?\s*([0-9]+(?:\.[0-9]+)?)"
-                             r".*?(?:Limit|budget)\s*[:€]?\s*([0-9]+(?:\.[0-9]+)?)",
-                             context, flags=re.IGNORECASE | re.DOTALL):
+        for m in re.finditer(
+            r"Category\s*:\s*(.+?)\s*(?:\n|,).*?(?:Spent|spend)\s*[:€]?\s*([0-9]+(?:\.[0-9]+)?)"
+            r".*?(?:Limit|budget)\s*[:€]?\s*([0-9]+(?:\.[0-9]+)?)",
+            context,
+            flags=re.IGNORECASE | re.DOTALL
+        ):
             cat = m.group(1).strip()
             spent = float(m.group(2))
             limit = float(m.group(3))
@@ -340,6 +514,5 @@ class AIService:
             lines.append("- Flag unusual spikes (2–3x your typical transaction size) for review.")
 
         lines.append("")
-        lines.append("Tip: If you want more precise advice, include in the context: category limits, spent-to-date, and remaining days in month.")
-
+        lines.append("Tip: For more precise advice, include category limits + spent-to-date + remaining days in month.")
         return "\n".join(lines)

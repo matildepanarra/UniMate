@@ -6,7 +6,7 @@ with AI-driven data capture and Langfuse observability.
 import streamlit as st
 from dotenv import load_dotenv
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 
 # Services imports
 from services import db_connector
@@ -15,6 +15,10 @@ from services.budget_service import BudgetService
 from services.analytics_service import AnalyticsService
 from services.ai_service import AIService
 from utils.tracing import init_tracing
+
+# ✅ Tool calling (router + schemas)
+from ai.tool_schemas import TOOLS
+from ai.tool_router import execute_tool
 
 # Loads environment variables
 load_dotenv()
@@ -58,11 +62,18 @@ def notify_db_updated():
     """Bumps a token so widgets refresh + rerun the app."""
     st.session_state["_last_db_update"] = datetime.now().isoformat()
 
+def tool_args(**kwargs):
+    """
+    Helper: always inject db_file in tool arguments (your schema requires it).
+    """
+    return {"db_file": DB_FILE, **kwargs}
+
 # Initialize the DB and Services (Executed only on first load)
 if "services_ready" not in st.session_state:
     try:
         db_connector.initialize_database()
 
+        # ✅ keep services for the parts of the app that still depend on them
         st.session_state.expense_service = ExpenseService(db_file=DB_FILE)
         st.session_state.budget_service = BudgetService(db_file=DB_FILE)
         st.session_state.analytics_service = AnalyticsService(db_file=DB_FILE)
@@ -75,51 +86,39 @@ if "services_ready" not in st.session_state:
         st.error("Verify if 'db_connector.py' contains 'initialize_database' and connection helpers.")
         st.stop()
 
-# --- ORCHESTRATION: FUNCTION OF AI FLOW (TEXT) ---
-def process_ai_expense(user_id: int, text: str):
-    expense_service = st.session_state.expense_service
-    expense_id = expense_service.add_expense_from_document(user_id, text)
-    if expense_id:
-        return expense_service.get_expense(expense_id)
-    return None
+# -------------------------------------------------------------------
+# TOOL-CALLING ORCHESTRATION HELPERS (local to Streamlit)
+# -------------------------------------------------------------------
+def run_tools_from_model(tool_calls):
+    """
+    Executes tool calls (list of {"name":..,"arguments":..}) using your tool_router.
+    Ensures db_file is present.
+    Returns list of tool results.
+    """
+    results = []
+    for tc in tool_calls or []:
+        name = tc.get("name")
+        args = tc.get("arguments") or {}
 
-# --- ORCHESTRATION: DOCUMENT INGESTION ---
-def process_ai_document(user_id: int, file_bytes: bytes, mime_type: str):
-    ai_client = st.session_state.ai_client
-    expense_service = st.session_state.expense_service
+        # guarantee db_file exists (schema requires it)
+        if "db_file" not in args:
+            args["db_file"] = DB_FILE
 
-    parsed = ai_client.ingest_document(file_bytes=file_bytes, mime_type=mime_type)
+        try:
+            out = execute_tool(name, args)
+            results.append({"name": name, "ok": True, "result": out, "arguments": args})
+        except Exception as e:
+            results.append({"name": name, "ok": False, "error": str(e), "arguments": args})
+    return results
 
-    saved = []
-    for tx in parsed.get("transactions", []) or []:
-        amount = float(tx.get("amount", 0.0) or 0.0)
-        description = str(tx.get("description", "") or "").strip()
-        date_str = str(tx.get("date", "") or "").strip() or datetime.now().strftime("%Y-%m-%d")
-
-        if amount <= 0 or not description:
-            continue
-
-        category_raw = expense_service.ai_client.classify_expense(
-            amount=amount,
-            description=description,
-            categories_list=expense_service.valid_categories
-        )
-        final_category = (category_raw or "").split("\n")[0].strip()
-        if final_category not in expense_service.valid_categories:
-            final_category = "Others"
-
-        expense_id = expense_service.add_expense(
-            user_id=user_id,
-            amount=amount,
-            description=description,
-            date_str=date_str,
-            category=final_category
-        )
-
-        if expense_id:
-            saved.append(expense_service.get_expense(expense_id))
-
-    return parsed, saved
+def has_db_side_effect(tool_results):
+    """
+    crude heuristic: these tools write to DB
+    """
+    for r in tool_results or []:
+        if r.get("ok") and r.get("name") in {"add_expense", "set_budget"}:
+            return True
+    return False
 
 # --- PRINCIPAL UI ---
 st.title("💸 UniMate")
@@ -134,7 +133,7 @@ This app demonstrates:
 - Expense Tracking
 - Budget Management
 - Financial Analytics
-- AI-Chat Assistant
+- AI-Chat Assistant (Tool Calling)
 """
     )
     st.divider()
@@ -164,15 +163,15 @@ with tab0:
 UniMate is your AI-powered financial assistant that helps you track expenses, manage budgets, and gain insights into your spending habits.
 
 **Features:**
-- **Expense Tracking:** Easily log your expenses using AI-powered text processing or document ingestion.
-- **Budget Management:** Set and monitor budgets for different categories.
-- **Financial Analytics:** Visualize your spending patterns and detect anomalies.
-- **AI Assistant:** Chat with an AI to get insights about your finances.
+- **Expense Tracking:** Log expenses using tool calling or document ingestion.
+- **Budget Management:** Set and monitor budgets per category.
+- **Financial Analytics:** Visualize spending patterns and detect anomalies.
+- **AI Assistant:** Chat with an AI to query and update your finances using tools.
 """
     )
 
 # ----------------------------------------
-# TAB 1: EXPENSES
+# TAB 1: EXPENSES  (tool calling-friendly)
 # ----------------------------------------
 with tab1:
     st.header("Expense Tracking")
@@ -190,50 +189,111 @@ with tab1:
             st.session_state.expense_saved_flag = False
             st.session_state.last_saved_expense = None
 
-        st.subheader("Insert Information:")
+        st.subheader("Insert Information (Tool Calling):")
         ai_input = st.text_area(
             "Transaction Text:",
             height=150,
-            placeholder="Paste the receipt or statement text about expense...",
+            placeholder="Example: 'Spent 12.50€ at Starbucks on 2025-12-16 in Food'",
             key="ai_input_tab1",
         )
 
-        if st.button("Process Text with AI and Save", type="primary", use_container_width=True, key="btn_text_tab1"):
+        # NOTE: here we still use your AI extraction/classification pipeline,
+        # then we SAVE via the tool 'add_expense' so everything matches tool calling.
+        if st.button("Process Text with AI and Save (via Tool)", type="primary", use_container_width=True, key="btn_text_tab1"):
             if not ai_input.strip():
                 st.warning("Please enter the text.")
             else:
-                with st.spinner("Processing (Extraction, Classification and Observability)..."):
-                    new_expense = process_ai_expense(USER_ID, ai_input)
+                with st.spinner("Extracting + categorizing..."):
+                    expense_service = st.session_state.expense_service
+                    ai_client = st.session_state.ai_client
 
-                if new_expense and isinstance(new_expense, dict) and new_expense.get("id"):
-                    # ✅ set flags then rerun (message appears on next run)
-                    st.session_state.expense_saved_flag = True
-                    st.session_state.last_saved_expense = new_expense
-                    notify_db_updated()
-                    st.rerun()
-                else:
-                    st.error("Failed to process the expense. Check logs and your Gemini key.")
+                    # Use your compat extractor to get 1 tx
+                    tx = ai_client.extract_document_data(ai_input) or {}
+                    amount = float(tx.get("amount", 0.0) or 0.0)
+                    vendor = str(tx.get("description", "") or "").strip()
+                    date_str = str(tx.get("date", "") or "").strip() or datetime.now().strftime("%Y-%m-%d")
+
+                    if amount <= 0 or not vendor:
+                        st.error("Could not extract a valid transaction (amount/description missing).")
+                    else:
+                        # choose category (AI classify)
+                        cat = str(tx.get("category", "") or "").strip()
+                        if cat not in expense_service.valid_categories:
+                            cat = ai_client.classify_expense(amount, vendor, expense_service.valid_categories)
+
+                        if cat not in expense_service.valid_categories:
+                            cat = "Others"
+
+                        # ✅ save via TOOL
+                        expense_id = execute_tool("add_expense", tool_args(
+                            user_id=USER_ID,
+                            amount=amount,
+                            category=cat,
+                            vendor=vendor,
+                            transaction_date=date_str,
+                            notes=f"From text: {vendor}"
+                        ))
+
+                        if expense_id:
+                            # fetch saved row via TOOL
+                            saved = execute_tool("get_expense", tool_args(expense_id=int(expense_id)))
+
+                            st.session_state.expense_saved_flag = True
+                            st.session_state.last_saved_expense = saved if isinstance(saved, dict) else {"id": expense_id}
+                            notify_db_updated()
+                            st.rerun()
+                        else:
+                            st.error("Failed to save expense via tool. Check logs.")
 
         st.divider()
 
-        st.subheader("Document Ingestion:")
+        st.subheader("Document Ingestion (AI parse -> save via Tool):")
         uploaded = st.file_uploader(
             "Upload receipt/invoice (PDF, JPG, PNG):",
             type=["pdf", "jpg", "jpeg", "png"],
             key="uploader_tab1"
         )
 
-        if st.button("Ingest Document and Save", type="primary", use_container_width=True, key="btn_doc_tab1"):
+        if st.button("Ingest Document and Save (via Tools)", type="primary", use_container_width=True, key="btn_doc_tab1"):
             if uploaded is None:
                 st.warning("Please upload a PDF or image file.")
             else:
                 with st.spinner("Ingesting document and saving expenses..."):
-                    parsed, saved = process_ai_document(USER_ID, uploaded.read(), uploaded.type)
+                    ai_client = st.session_state.ai_client
+                    expense_service = st.session_state.expense_service
 
-                if saved:
-                    # ✅ set flags then rerun (show last saved expense)
+                    parsed = ai_client.ingest_document(file_bytes=uploaded.read(), mime_type=uploaded.type)
+
+                    saved_rows = []
+                    for tx in parsed.get("transactions", []) or []:
+                        amount = float(tx.get("amount", 0.0) or 0.0)
+                        vendor = str(tx.get("description", "") or "").strip()
+                        date_str = str(tx.get("date", "") or "").strip() or datetime.now().strftime("%Y-%m-%d")
+
+                        if amount <= 0 or not vendor:
+                            continue
+
+                        cat = ai_client.classify_expense(amount, vendor, expense_service.valid_categories)
+                        if cat not in expense_service.valid_categories:
+                            cat = "Others"
+
+                        expense_id = execute_tool("add_expense", tool_args(
+                            user_id=USER_ID,
+                            amount=amount,
+                            category=cat,
+                            vendor=vendor,
+                            transaction_date=date_str,
+                            notes=f"From document: {uploaded.type}"
+                        ))
+
+                        if expense_id:
+                            row = execute_tool("get_expense", tool_args(expense_id=int(expense_id)))
+                            if isinstance(row, dict):
+                                saved_rows.append(row)
+
+                if saved_rows:
                     st.session_state.expense_saved_flag = True
-                    st.session_state.last_saved_expense = saved[-1] if len(saved) > 0 else None
+                    st.session_state.last_saved_expense = saved_rows[-1]
                     notify_db_updated()
                     st.rerun()
                 else:
@@ -242,7 +302,7 @@ with tab1:
                     st.json(parsed)
 
 # ----------------------------------------
-# TAB 2: BUDGETS
+# TAB 2: BUDGETS  (use tool set_budget + tool budget_calculator)
 # ----------------------------------------
 with tab2:
     st.header("Budget Management")
@@ -251,56 +311,62 @@ with tab2:
     if USER_ID is None:
         st.info("Please login in the Profile tab to continue.")
     else:
-        budget_service = st.session_state.budget_service
         expense_service = st.session_state.expense_service
 
-        st.subheader("Set Monthly Limit")
+        st.subheader("Set Monthly Limit (via Tool)")
         categories = expense_service.valid_categories
+
+        # month range
+        today = date.today()
+        start_date = today.replace(day=1).strftime("%Y-%m-%d")
+        # next month
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        end_date = next_month.strftime("%Y-%m-%d")
 
         col1, col2 = st.columns(2)
         category = col1.selectbox("Category:", categories, key="budget_cat_select_tab2")
         amount_limit = col2.number_input(f"Monthly Limit for {category} (€)", min_value=0.0, step=10.0)
 
         if st.button("Save Budget", key="save_budget_btn_tab2"):
-            budget_service.set_budget(USER_ID, category, amount_limit)
-            st.success(f"Limit of €{amount_limit:.2f} set for {category}.")
-            notify_db_updated()
-            st.rerun()
+            budget_id = execute_tool("set_budget", tool_args(
+                user_id=USER_ID,
+                category=category,
+                amount_limit=float(amount_limit),
+                start_date=start_date,
+                end_date=end_date
+            ))
+            if budget_id:
+                st.success(f"Budget saved (id={budget_id}). Limit €{amount_limit:.2f} for {category}.")
+                notify_db_updated()
+                st.rerun()
+            else:
+                st.error("Failed to set budget via tool. Check logs.")
 
         st.divider()
 
-        st.subheader("Current Status and Generate AI Analysis of Budget")
-
-        # ✅ dataframe key changes when DB changes => widget always refreshes
+        st.subheader("Current Status (via Tool)")
         df_key = f"budget_status_{USER_ID}_{st.session_state.get('_last_db_update','0')}"
-        status_report = budget_service.get_budget_status(USER_ID)
+
+        status_report = execute_tool("budget_calculator", tool_args(
+            user_id=USER_ID,
+            start_date=start_date,
+            end_date=end_date
+        ))
 
         if status_report:
             st.dataframe(pd.DataFrame(status_report), use_container_width=True, key=df_key)
-
-            if st.button("Generate AI Analysis of Budget", key="analyze_budget_tab2"):
-                with st.spinner("AI is analyzing the history and budget..."):
-                    analysis_result = budget_service.analyze_budget(USER_ID)
-                st.info("AI Recommendation:")
-                st.write(analysis_result.get("recommendation", "No recommendation could be generated."))
         else:
-            st.info("No active budget found.")
+            st.info("No active budget found for this month.")
 
         if st.button("🔄 Refresh Budget Status", key="refresh_budget_tab2"):
             notify_db_updated()
             st.rerun()
 
-        if st.button("🗑️ Clear All Budgets", type="secondary", key="clear_budgets_btn_tab2"):
-            rows_deleted = budget_service.clear_all_budgets(USER_ID)
-            if rows_deleted > 0:
-                st.success(f"✅ {rows_deleted} budgets deleted successfully!")
-            else:
-                st.info("No budgets to delete or an error occurred.")
-            notify_db_updated()
-            st.rerun()
-
 # ----------------------------------------
-# TAB 3: ANALYTICS
+# TAB 3: ANALYTICS  (kept as-is, depends on services)
 # ----------------------------------------
 with tab3:
     st.header("Financial Analytics")
@@ -344,9 +410,10 @@ with tab3:
 
             st.subheader("Expense Summary")
             try:
-                summary = expense_service.summarize_expense(USER_ID) or {}
+                # You HAVE a tool for summarize_expense; use it to stay consistent
+                summary = execute_tool("summarize_expense", tool_args(user_id=USER_ID)) or {}
             except Exception as e:
-                st.error(f"Error in expense_service.summarize_expense: {e}")
+                st.error(f"Error summarize_expense tool: {e}")
                 summary = {}
 
             col1, col2, col3 = st.columns(3)
@@ -356,50 +423,16 @@ with tab3:
 
             st.divider()
 
-            st.subheader("Distribution by Category")
+            st.subheader("Anomaly Alert (via Tool)")
             try:
-                breakdown = analytics_service.get_category_breakdown(USER_ID) or {}
+                anomalies = execute_tool("detect_anomalies", tool_args(user_id=USER_ID)) or []
             except Exception as e:
-                st.error(f"Error in analytics_service.get_category_breakdown: {e}")
-                breakdown = {}
-
-            total_lifetime = float(breakdown.get("total_spent_lifetime", 0.0) or 0.0)
-
-            if total_lifetime > 0:
-                data_list = []
-                for cat, data in breakdown.items():
-                    if cat == "total_spent_lifetime":
-                        continue
-                    if isinstance(data, dict):
-                        data_list.append({"Category": cat, "Amount": float(data.get("total", 0.0) or 0.0)})
-                    else:
-                        data_list.append({"Category": str(cat), "Amount": 0.0})
-
-                df_cat = pd.DataFrame(data_list).sort_values("Amount", ascending=False)
-                if not df_cat.empty:
-                    st.bar_chart(df_cat, x="Category", y="Amount", use_container_width=True)
-                    st.dataframe(df_cat, use_container_width=True)
-                else:
-                    st.info("No expenses available to generate category distribution.")
-            else:
-                st.info("No expenses available to generate category distribution.")
-
-            st.divider()
-
-            st.subheader("Anomaly Alert")
-            try:
-                anomalies = analytics_service.detect_anomalies(USER_ID) or []
-            except Exception as e:
-                st.error(f"Error in analytics_service.detect_anomalies: {e}")
+                st.error(f"Error detect_anomalies tool: {e}")
                 anomalies = []
 
             if anomalies:
                 df_anom = to_df(anomalies)
-                st.warning(
-                    f"{len(df_anom)} anomalous expenses detected."
-                    if not df_anom.empty else
-                    f"{len(anomalies)} anomalous expenses detected."
-                )
+                st.warning(f"{len(df_anom)} anomalous expenses detected." if not df_anom.empty else f"{len(anomalies)} anomalous expenses detected.")
                 if not df_anom.empty:
                     st.dataframe(df_anom, use_container_width=True)
                 else:
@@ -407,11 +440,27 @@ with tab3:
             else:
                 st.success("No anomalous expenses detected.")
 
+            st.divider()
+
+            st.subheader("Spending Trend (via Tool)")
+            try:
+                trend = execute_tool("get_spending_trend", tool_args(user_id=USER_ID)) or []
+            except Exception as e:
+                st.error(f"Error get_spending_trend tool: {e}")
+                trend = []
+
+            df_trend = to_df(trend)
+            if not df_trend.empty and "year_month" in df_trend.columns and "total_spent" in df_trend.columns:
+                st.line_chart(df_trend, x="year_month", y="total_spent", use_container_width=True)
+                st.dataframe(df_trend, use_container_width=True)
+            else:
+                st.info("No trend data available.")
+
 # ----------------------------------------
-# TAB 4: AI ASSISTANT
+# TAB 4: AI ASSISTANT (tool calling via your router/schema)
 # ----------------------------------------
 with tab4:
-    st.header("AI Assistant (Chat)")
+    st.header("AI Assistant (Chat) — Tool Calling")
 
     USER_ID = get_user_id()
     if USER_ID is None:
@@ -421,31 +470,52 @@ with tab4:
             st.session_state.chat_history = []
 
         ai_client = st.session_state.ai_client
-        budget_service = st.session_state.budget_service
-        expense_service = st.session_state.expense_service
 
-        context_data = {
-            "summary": expense_service.summarize_expense(USER_ID),
-            "budget_status": budget_service.get_budget_status(USER_ID),
-        }
-
+        # show history
         for message in st.session_state.chat_history:
             with st.chat_message(message["role"]):
                 st.write(message["content"])
 
-        user_input = st.chat_input("Ask about your expenses, budgets and trends:")
+        user_input = st.chat_input("Ask about your expenses, budgets and trends (can also add/save via tools):")
 
         if user_input:
             st.session_state.chat_history.append({"role": "user", "content": user_input})
             with st.chat_message("user"):
                 st.write(user_input)
 
-            with st.spinner("AI is consulting your data..."):
-                answer = ai_client.ai_assistant(user_input, context_data)
+            # ✅ This assumes your AIService exposes ONE method that returns tool_calls OR text.
+            # If your AIService doesn't yet, you need to add it (I can paste the exact code next).
+            with st.spinner("AI is thinking (tool calling)..."):
+                # expected dict:
+                # { "text": "...", "tool_calls": [ {"name":"add_expense","arguments":{...}}, ... ] }
+                model_out = ai_client.chat_with_tools(user_input, tools=TOOLS, user_id=USER_ID)
+
+            tool_calls = model_out.get("tool_calls") or []
+            if tool_calls:
+                tool_results = run_tools_from_model(tool_calls)
+
+                # If DB changed, refresh other tabs
+                if has_db_side_effect(tool_results):
+                    notify_db_updated()
+
+                # Ask model to produce final response using tool results
+                with st.spinner("Finalizing response..."):
+                    final_text = ai_client.finalize_with_tool_results(
+                        user_input,
+                        tool_calls=tool_calls,
+                        tool_results=tool_results
+                    )
+                answer = final_text or "Done."
+            else:
+                answer = model_out.get("text") or "..."
 
             st.session_state.chat_history.append({"role": "assistant", "content": answer})
             with st.chat_message("assistant"):
                 st.write(answer)
+
+            # refresh if DB changed
+            if st.session_state.get("_last_db_update") != "0":
+                st.rerun()
 
         if len(st.session_state.chat_history) > 0:
             if st.button("Clean Chat History"):
