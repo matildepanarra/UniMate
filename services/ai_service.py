@@ -6,7 +6,7 @@ Responsibilities:
 - Expose AI capabilities as high-level methods
 - Handle document ingestion (image / PDF)
 - Classify expenses
-- Tool-calling orchestration using local Python tools (SQLite)
+- Native tool-calling orchestration using local Python tools (SQLite)
 """
 
 import os
@@ -23,8 +23,9 @@ try:
 except Exception:
     from utils.observability import observe
 
-from ai.tool_schemas import TOOLS
-from ai.tool_router import execute_tool
+# ✅ Native tools + loop
+from ai.tools_native import TOOLS  # (types.Tool with function_declarations)
+from ai.tool_impl import TOOL_IMPL  # dict: tool_name -> python function
 
 
 # --------------------------------------------------
@@ -135,173 +136,152 @@ class AIService:
         return response.text or ""
 
     # --------------------------------------------------
-    # TOOL CALLING (JSON-based: works even if native function calling is not enabled)
+    # NATIVE TOOL CALLING (Gemini function calling)
+    # --------------------------------------------------
+        # --------------------------------------------------
+    # NATIVE TOOL CALLING (Gemini function calling) + CHAT MEMORY
     # --------------------------------------------------
     @observe()
-    def chat_with_tools(self, user_text: str, tools: Optional[list] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
+    def run_tool_calling_flow(
+        self,
+        user_text: str,
+        db_file: str,
+        user_id: Optional[int] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict[str, Any]:
         """
-        Returns:
-          {
-            "text": str | None,
-            "tool_calls": [ {"name": str, "arguments": dict}, ... ]
-          }
+        Native flow with memory:
+          - builds contents from chat history (user/model)
+          - appends latest user_text
+          - model decides -> function_call(s) or direct text
+          - execute tool calls locally (Python/SQLite)
+          - model writes final response
 
-        IMPORTANT:
-        - This implementation forces the model to output JSON (tool_calls) when needed.
-        - It does NOT rely on native Gemini function calling support.
+        history format expected (Streamlit):
+          [ {"role":"user","content":"..."}, {"role":"assistant","content":"..."} ... ]
         """
         if not self.client:
-            return {"text": "AI offline.", "tool_calls": []}
-
-        tools = tools or TOOLS
-
-        # We show the tool names + their required params to help the model produce correct calls.
-        tool_catalog = []
-        for t in tools:
-            fn = (t or {}).get("function") or {}
-            params = (fn.get("parameters") or {})
-            tool_catalog.append({
-                "name": fn.get("name"),
-                "description": fn.get("description", ""),
-                "required": params.get("required", []),
-                "properties": list((params.get("properties") or {}).keys())
-            })
+            return {"answer": "AI offline.", "db_updated": False, "tool_results": []}
 
         system_instruction = (
-            "You are an assistant for a personal finance app.\n"
-            "You may either answer normally OR request tool execution.\n\n"
-            "If tool execution is needed, output ONLY valid JSON with this shape:\n"
-            "{\n"
-            '  "tool_calls": [\n'
-            '    {"name": "tool_name", "arguments": { ... }}\n'
-            "  ]\n"
-            "}\n\n"
-            "If no tool is needed, output ONLY valid JSON with this shape:\n"
-            '{ "text": "your answer here" }\n\n'
-            "Rules:\n"
-            "- Use ONLY tools from the catalog.\n"
-            "- Be strict with types.\n"
-            "- transaction_date must be YYYY-MM-DD.\n"
-            "- ALWAYS include db_file in tool arguments (required).\n"
+            "You are UniMate, a personal finance adviser inside a budgeting app.\n"
+            "Your job is to help the user save money, plan budgets, and improve spending habits.\n"
+            "You ARE allowed to make recommendations and suggestions.\n"
+            "Important:\n"
+            "- You are not a licensed financial professional. Provide educational guidance only.\n"
+            "- Use the user's real data via tools whenever possible before advising.\n"
+            "- If the user asks 'where should I save next month?', do this:\n"
+            "  1) call summarize_expense and get_spending_trend\n"
+            "  2) if budgets exist, call budget_calculator for the current month\n"
+            "  3) then give 3-5 concrete, personalized actions (bullets) and one simple next step.\n"
+            "- Never say you 'can't make recommendations'. If data is insufficient, ask ONE targeted question.\n"
+            "- Keep answers short, practical, and in the user's language.\n"
         )
 
-        # give user_id hint (helps the model)
         if user_id is not None:
             system_instruction += f"\nUser ID for tool calls: {int(user_id)}\n"
 
-        payload = {
-            "user_text": user_text,
-            "tool_catalog": tool_catalog
-        }
+        # ---- Build conversation memory ----
+        contents: List[types.Content] = []
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=json.dumps(payload, ensure_ascii=False),
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-            ),
-        )
+        # Convert Streamlit history into GenAI roles: user/model
+        if history:
+            for m in history:
+                role = (m.get("role") or "").strip().lower()
+                text = (m.get("content") or "").strip()
+                if not text:
+                    continue
 
-        raw = (response.text or "").strip()
+                if role == "user":
+                    contents.append(types.Content(role="user", parts=[types.Part(text=text)]))
+                elif role in ("assistant", "model"):
+                    contents.append(types.Content(role="model", parts=[types.Part(text=text)]))
 
-        try:
-            data = json.loads(raw)
-        except Exception:
-            # fallback: just answer
-            return {"text": self.ai_assistant(user_text, {}), "tool_calls": []}
+        # Append latest user message (avoid duplicate if history already includes it)
+        if not contents or contents[-1].role != "user" or contents[-1].parts[0].text != user_text:
+            contents.append(types.Content(role="user", parts=[types.Part(text=user_text)]))
 
-        tool_calls = data.get("tool_calls") or []
-        if tool_calls:
-            # normalize tool calls
-            normalized = []
-            for tc in tool_calls:
-                name = tc.get("name")
-                args = tc.get("arguments") or {}
-                if name:
-                    normalized.append({"name": name, "arguments": dict(args)})
-            return {"text": None, "tool_calls": normalized}
-
-        txt = data.get("text")
-        return {"text": str(txt) if txt is not None else "", "tool_calls": []}
-
-    @observe()
-    def finalize_with_tool_results(self, user_text: str, tool_calls: list, tool_results: list) -> str:
-        """
-        Produces the final assistant response AFTER tools ran.
-        """
-        if not self.client:
-            return "Done."
-
-        system_instruction = (
-            "You are a finance assistant.\n"
-            "You receive tool calls and tool execution results.\n"
-            "Write a clear final message to the user.\n"
-            "If a tool failed (ok=false or result is null/None/-1), explain briefly and suggest next step.\n"
-            "Do not output JSON. Output normal text.\n"
-        )
-
-        payload = {
-            "user_text": user_text,
-            "tool_calls": tool_calls,
-            "tool_results": tool_results,
-        }
-
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=json.dumps(payload, ensure_ascii=False),
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                system_instruction=system_instruction,
-            ),
-        )
-        return response.text or "Done."
-
-    @observe()
-    def run_tool_calling_flow(self, user_text: str, db_file: str, user_id: Optional[int] = None) -> Dict[str, Any]:
-        """
-        Full flow:
-          - model decides -> tool calls OR text
-          - execute tool calls locally
-          - finalize response
-
-        Returns:
-          { "answer": str, "db_updated": bool, "tool_results": list }
-        """
-        first = self.chat_with_tools(user_text, tools=TOOLS, user_id=user_id)
-        tool_calls = first.get("tool_calls") or []
-
-        if not tool_calls:
-            return {"answer": first.get("text") or "", "db_updated": False, "tool_results": []}
-
-        tool_results = []
+        tool_results: List[Dict[str, Any]] = []
         db_updated = False
 
-        for tc in tool_calls:
-            name = tc.get("name")
-            args = tc.get("arguments") or {}
+        while True:
+            resp = self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    tools=TOOLS,
+                    temperature=0.2,
+                    system_instruction=system_instruction,
+                ),
+            )
 
-            # Guarantee db_file exists (your schema requires it)
-            args["db_file"] = db_file
+            cand = resp.candidates[0].content if resp.candidates else None
+            if not cand or not cand.parts:
+                return {
+                    "answer": resp.text or "No response from model.",
+                    "db_updated": db_updated,
+                    "tool_results": tool_results,
+                }
 
-            try:
-                result = execute_tool(name, args)
-                ok = True
-            except Exception as e:
-                result = None
-                ok = False
-                tool_results.append({"name": name, "ok": ok, "error": str(e), "args": args})
-                continue
+            # Collect function calls
+            function_calls = []
+            for p in cand.parts:
+                fc = getattr(p, "function_call", None)
+                if fc is not None:
+                    function_calls.append(fc)
 
-            tool_results.append({"name": name, "ok": ok, "result": result, "args": args})
+            # No tool calls => final response
+            if not function_calls:
+                return {
+                    "answer": resp.text or "",
+                    "db_updated": db_updated,
+                    "tool_results": tool_results,
+                }
 
-            # crude: which tools write to DB
-            if name in {"add_expense", "set_budget"} and result not in (None, -1):
-                db_updated = True
+            # Add model tool-call message to history
+            contents.append(cand)
 
-        final_text = self.finalize_with_tool_results(user_text, tool_calls=tool_calls, tool_results=tool_results)
-        return {"answer": final_text, "db_updated": db_updated, "tool_results": tool_results}
+            # Execute tool calls and return function_response(s)
+            tool_response_parts = []
+            for fc in function_calls:
+                name = fc.name
+                args = fc.args or {}
+
+                # Always inject db_file
+                args["db_file"] = db_file
+
+                # If tool expects user_id and model didn't provide it
+                if user_id is not None and "user_id" in args and (args.get("user_id") in (None, "", 0)):
+                    args["user_id"] = int(user_id)
+
+                if name not in TOOL_IMPL:
+                    result = {"error": f"Tool '{name}' not implemented."}
+                    ok = False
+                else:
+                    try:
+                        result = TOOL_IMPL[name](**args)
+                        ok = True
+                    except Exception as e:
+                        result = {"error": str(e)}
+                        ok = False
+
+                tool_results.append({"name": name, "ok": ok, "result": result, "args": dict(args)})
+
+                if ok and name in {"add_expense", "set_budget"} and result not in (None, -1):
+                    db_updated = True
+
+                tool_response_parts.append(
+                    types.Part(
+                        function_response=types.FunctionResponse(
+                            name=name,
+                            response={"result": result, "ok": ok},
+                        )
+                    )
+                )
+
+            contents.append(types.Content(role="tool", parts=tool_response_parts))
+            # loop continues until model returns final text
+
 
     # --------------------------------------------------
     # DOCUMENT INGESTION (PDF / IMAGE)
@@ -507,12 +487,13 @@ class AIService:
             lines.append("- If this is recurring, raise the limit only if it matches your real priorities.")
         else:
             lines.append("")
-            lines.append("I couldn’t clearly detect category limits vs spending from the context.")
+            lines.append("I couldn't clearly detect category limits vs spending from the context.")
             lines.append("Suggestions (safe defaults):")
             lines.append("- Set monthly limits per category (Food, Transport, Leisure, Bills).")
             lines.append("- Review recurring subscriptions and cancel unused ones.")
-            lines.append("- Flag unusual spikes (2–3x your typical transaction size) for review.")
+            lines.append("- Flag unusual spikes (2-3x your typical transaction size) for review.")
 
         lines.append("")
         lines.append("Tip: For more precise advice, include category limits + spent-to-date + remaining days in month.")
         return "\n".join(lines)
+
