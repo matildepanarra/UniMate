@@ -18,10 +18,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-try:
-    from langfuse import observe
-except Exception:
-    from utils.observability import observe
+from langfuse import observe
 
 
 from ai.tools_schema import TOOLS 
@@ -109,39 +106,11 @@ class AIService:
             self.client = None
 
     # --------------------------------------------------
-    # BASIC CHAT (no tools)
-    # --------------------------------------------------
-    @observe()
-    def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
-        if not self.client:
-            return "AI assistant unavailable. Please check the API credentials."
-
-        context_str = json.dumps(context_data or {}, ensure_ascii=False)
-
-        system_instruction = self.prompts.format("ai_assistant_system")
-
-        user_prompt = (
-            f"User Question: {user_question}\n"
-            f"Context Data (optional): {context_str}\n\n"
-            "Answer concisely. If you need fresh numbers, call tools."
-        )
-
-        response = self.client.models.generate_content(
-            model = self.model,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3,
-                system_instruction=system_instruction,
-            ),
-        )
-        return response.text or ""
-
-    # --------------------------------------------------
-    # NATIVE TOOL CALLING (Gemini function calling)
+    # AI Assistant
     # --------------------------------------------------
 
     @observe()
-    def run_tool_calling_flow(
+    def ai_assistant(
         self,
         user_text: str,
         db_file: str,
