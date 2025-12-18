@@ -114,6 +114,17 @@ TOOLS = [
                     required=["db_file", "user_id"],
                 ),
             ),
+            types.FunctionDeclaration(
+                name="remove_expense",
+                description="Delete an expense from the database by expense id (only if it belongs to the user).",
+                parameters=schema_object(
+                    properties={
+                        "user_id": types.Schema(type="integer", description="User id"),
+                        "expense_id": types.Schema(type="integer", description="Expense id to delete"),
+                    },
+                    required=["user_id", "expense_id"],
+                ),
+            )
         ]
     )
 ]

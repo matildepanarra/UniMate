@@ -6,6 +6,7 @@ from tools.detect_anomalies import detect_anomalies
 from tools.get_spending_trend import get_spending_trend
 from tools.summarize_expense import summarize_expense
 from tools.list_expenses import list_expenses
+from tools.remove_expense import remove_expense
 
 TOOL_IMPL = {
     "add_expense": add_expense,
@@ -16,5 +17,6 @@ TOOL_IMPL = {
     "get_spending_trend": get_spending_trend,
     "summarize_expense": summarize_expense,
     "list_expenses": list_expenses,
+    "remove_expense": remove_expense, 
 }
 
