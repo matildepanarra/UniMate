@@ -139,7 +139,7 @@ class AIService:
     # NATIVE TOOL CALLING (Gemini function calling)
     # --------------------------------------------------
     @observe()
-    def run_tool_calling_flow(
+    def ai_chat(
         self,
         user_text: str,
         db_file: str,

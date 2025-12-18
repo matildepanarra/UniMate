@@ -576,7 +576,7 @@ with tab_ai:
                 st.write(user_input)
 
             with st.spinner("AI is thinking ..."):
-                out = ai_client.run_tool_calling_flow(
+                out = ai_client.ai_chat(
                     user_text=user_input,
                     db_file= DB_FILE,
                     user_id= USER_ID,
