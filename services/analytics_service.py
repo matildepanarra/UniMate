@@ -6,10 +6,9 @@ from typing import Dict, List
 from tools.detect_anomalies import detect_anomalies as detect_anomalies_tool
 from tools.get_spending_trend import get_spending_trend as get_spending_trend_tool
 from services import db_connector
-try:
-    from langfuse import observe
-except Exception:
-    from utils.observability import observe
+
+from langfuse import observe
+
 
 
 class AnalyticsService:

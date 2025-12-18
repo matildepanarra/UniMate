@@ -18,11 +18,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-try:
-    from langfuse import observe
-except Exception:
-    from utils.observability import observe
-
+from langfuse import observe
 
 from ai.tools_schema import TOOLS 
 from ai.tools_router import TOOL_IMPL  

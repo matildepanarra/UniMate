@@ -6,10 +6,7 @@ Orchestrates calls to AIService for extraction and categorization.
 from typing import Dict, Optional
 from datetime import datetime
 
-try:
-    from langfuse import observe
-except Exception:
-    from utils.observability import observe
+from langfuse import observe
 
 from services import db_connector
 from services.ai_service import AIService

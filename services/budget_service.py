@@ -12,15 +12,11 @@ from datetime import datetime
 import sqlite3
 import json
 
-try:
-    from langfuse import observe
-except Exception:
-    from utils.observability import observe
+from langfuse import observe
 
 from services.ai_service import AIService
-from services import db_connector  # ✅ FIX: was missing
+from services import db_connector 
 
-# --- TOOLS ---
 from tools import set_budget as set_budget_tool
 from tools import budget_calculator as budget_calc_tool
 
