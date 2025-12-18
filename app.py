@@ -15,7 +15,7 @@ from services.budget_service import BudgetService
 from services.analytics_service import AnalyticsService
 from services.ai_service import AIService
 from utils.tracing import init_tracing
-from ai.tool_impl import TOOL_IMPL
+from ai.tools_router import TOOL_IMPL
 
 
 
@@ -160,7 +160,7 @@ with tab_expenses:
             st.success("Expense saved successfully!")
             last = st.session_state.get("last_saved_expense")
             if isinstance(last, dict) and last:
-                st.dataframe(pd.DataFrame([last]), use_container_width=True)
+                st.dataframe(pd.DataFrame([last]), width='stretch')
             st.session_state.expense_saved_flag = False
             st.session_state.last_saved_expense = None
 
@@ -172,7 +172,7 @@ with tab_expenses:
             key="ai_input_tab1",
         )
 
-        if st.button("Process Text with AI and Save", type="primary", use_container_width=True, key="btn_text_tab1"):
+        if st.button("Process Text with AI and Save", type="primary", width='stretch', key="btn_text_tab1"):
             if not ai_input.strip():
                 st.warning("Please enter the text.")
             else:
@@ -230,7 +230,7 @@ with tab_expenses:
             key="uploader_tab1",
         )
 
-        if st.button("Ingest Document and Save", type="primary", use_container_width=True, key="btn_doc_tab1"):
+        if st.button("Ingest Document and Save", type="primary", width='stretch', key="btn_doc_tab1"):
             if uploaded is None:
                 st.warning("Please upload a PDF or image file.")
             else:
@@ -308,7 +308,7 @@ with tab_expenses:
             rows = call_tool("list_expenses", **kwargs) or []
             df = pd.DataFrame(rows)
             if not df.empty:
-                st.dataframe(df, use_container_width=True, key=df_key)
+                st.dataframe(df, width='stretch', key=df_key)
             else:
                 st.info("No expenses found for the selected filters.")
         except Exception as e:
@@ -381,7 +381,7 @@ with tab_budgets:
         status_report = budget_service.get_budget_status(USER_ID)
 
         if status_report:
-            st.dataframe(pd.DataFrame(status_report), use_container_width=True, key=df_key)
+            st.dataframe(pd.DataFrame(status_report), width='stretch', key=df_key)
 
             if st.button("Generate AI Analysis of Budget", key="analyze_budget_tab2"):
                 with st.spinner("AI is analyzing the history and budget..."):
@@ -490,8 +490,8 @@ with tab_analytics:
 
                 df_cat = pd.DataFrame(data_list).sort_values("Amount", ascending=False)
                 if not df_cat.empty:
-                    st.bar_chart(df_cat, x="Category", y="Amount", use_container_width=True)
-                    st.dataframe(df_cat, use_container_width=True)
+                    st.bar_chart(df_cat, x="Category", y="Amount", width='stretch')
+                    st.dataframe(df_cat, width='stretch')
                 else:
                     st.info("No expenses available to generate category distribution.")
             else:
@@ -517,7 +517,7 @@ with tab_analytics:
                     f"{len(anomalies)} anomalous expenses detected."
                 )
                 if not df_anom.empty:
-                    st.dataframe(df_anom, use_container_width=True)
+                    st.dataframe(df_anom, width='stretch')
                 else:
                     st.json(anomalies)
             else:
@@ -537,8 +537,8 @@ with tab_analytics:
 
             df_trend = to_df(trend)
             if not df_trend.empty and "year_month" in df_trend.columns and "total_spent" in df_trend.columns:
-                st.line_chart(df_trend, x="year_month", y="total_spent", use_container_width=True)
-                st.dataframe(df_trend, use_container_width=True)
+                st.line_chart(df_trend, x="year_month", y="total_spent", width='stretch')
+                st.dataframe(df_trend, width='stretch')
             else:
                 st.info("No trend data available.")
 

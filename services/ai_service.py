@@ -24,9 +24,8 @@ except Exception:
     from utils.observability import observe
 
 
-from ai.tools_native import TOOLS  # (types.Tool with function_declarations)
-from ai.tool_impl import TOOL_IMPL  # dict: tool_name -> python function
-from ai.native_tool_loop import run_native_tool_calling
+from ai.tools_schema import TOOLS 
+from ai.tools_router import TOOL_IMPL  
 
 
 # --------------------------------------------------

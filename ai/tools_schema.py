@@ -1,7 +1,6 @@
-# ai/tools_native.py
 from google.genai import types
 
-def _schema_object(properties: dict, required: list):
+def schema_object(properties: dict, required: list):
     return types.Schema(
         type="OBJECT",
         properties=properties,
@@ -14,7 +13,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="add_expense",
                 description="Add a new expense to the database.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
@@ -30,7 +29,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="get_expense",
                 description="Get an expense by id.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "expense_id": types.Schema(type="INTEGER"),
@@ -41,7 +40,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="set_budget",
                 description="Upsert a budget limit for a user/category and period.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
@@ -56,7 +55,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="budget_calculator",
                 description="Compute spent vs limit per category for an active budget period.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
@@ -69,7 +68,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="detect_anomalies",
                 description="Detect anomalous expenses above 2x user average.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
@@ -80,7 +79,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="get_spending_trend",
                 description="Aggregate spending by year-month.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
@@ -91,7 +90,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="summarize_expense",
                 description="Return lifetime totals, count and average transaction value.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
@@ -102,7 +101,7 @@ TOOLS = [
             types.FunctionDeclaration(
                 name="list_expenses",
                 description="List expenses for a user with optional filters.",
-                parameters=_schema_object(
+                parameters=schema_object(
                     properties={
                         "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
