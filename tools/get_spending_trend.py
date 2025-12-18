@@ -9,6 +9,13 @@ def get_spending_trend(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: get_spending_trends
     Agrega gastos por mês/ano.
+
+    Args:
+        db_file (str): O caminho do ficheiro de base de dados.
+        user_id (int): O ID do utilizador.
+    
+    Returns:
+        List[Dict]: Uma lista de dicionários representando o gasto mensal.
     """
     sql = """
     SELECT

@@ -7,10 +7,15 @@ import services.db_connector as db_connector
 
 def summarize_expense(db_file: str, user_id: int) -> Dict:
     """
-    Returns a summary of expenses for a given user:
-    - total_spent_lifetime
-    - transaction_count
-    - avg_transaction_value
+    TOOL: summarize_expense
+    Fornece um resumo estatístico das despesas do utilizador.   
+
+    Args:
+        db_file (str): O caminho do ficheiro de base de dados.
+        user_id (int): O ID do utilizador.
+    
+    Returns:
+        Dict: Um dicionário com total gasto, contagem de transações e valor médio por transação.
     """
     sql = """
     SELECT

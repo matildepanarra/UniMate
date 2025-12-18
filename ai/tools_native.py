@@ -1,7 +1,7 @@
-from __future__ import annotations
+# ai/tools_native.py
 from google.genai import types
 
-def _schema_object(properties: dict, required: list[str]):
+def _schema_object(properties: dict, required: list):
     return types.Schema(
         type="OBJECT",
         properties=properties,
@@ -16,6 +16,7 @@ TOOLS = [
                 description="Add a new expense to the database.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                         "amount": types.Schema(type="NUMBER"),
                         "category": types.Schema(type="STRING"),
@@ -23,7 +24,7 @@ TOOLS = [
                         "transaction_date": types.Schema(type="STRING", description="YYYY-MM-DD"),
                         "notes": types.Schema(type="STRING"),
                     },
-                    required=["user_id", "amount", "category", "vendor", "transaction_date"],
+                    required=["db_file", "user_id", "amount", "category", "vendor", "transaction_date"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -31,9 +32,10 @@ TOOLS = [
                 description="Get an expense by id.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "expense_id": types.Schema(type="INTEGER"),
                     },
-                    required=["expense_id"],
+                    required=["db_file", "expense_id"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -41,13 +43,14 @@ TOOLS = [
                 description="Upsert a budget limit for a user/category and period.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                         "category": types.Schema(type="STRING"),
                         "amount_limit": types.Schema(type="NUMBER"),
                         "start_date": types.Schema(type="STRING"),
                         "end_date": types.Schema(type="STRING"),
                     },
-                    required=["user_id", "category", "amount_limit", "start_date", "end_date"],
+                    required=["db_file", "user_id", "category", "amount_limit", "start_date", "end_date"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -55,11 +58,12 @@ TOOLS = [
                 description="Compute spent vs limit per category for an active budget period.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                         "start_date": types.Schema(type="STRING"),
                         "end_date": types.Schema(type="STRING"),
                     },
-                    required=["user_id", "start_date", "end_date"],
+                    required=["db_file", "user_id", "start_date", "end_date"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -67,9 +71,10 @@ TOOLS = [
                 description="Detect anomalous expenses above 2x user average.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                     },
-                    required=["user_id"],
+                    required=["db_file", "user_id"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -77,9 +82,10 @@ TOOLS = [
                 description="Aggregate spending by year-month.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                     },
-                    required=["user_id"],
+                    required=["db_file", "user_id"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -87,9 +93,10 @@ TOOLS = [
                 description="Return lifetime totals, count and average transaction value.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                     },
-                    required=["user_id"],
+                    required=["db_file", "user_id"],
                 ),
             ),
             types.FunctionDeclaration(
@@ -97,6 +104,7 @@ TOOLS = [
                 description="List expenses for a user with optional filters.",
                 parameters=_schema_object(
                     properties={
+                        "db_file": types.Schema(type="STRING"),
                         "user_id": types.Schema(type="INTEGER"),
                         "limit": types.Schema(type="INTEGER"),
                         "offset": types.Schema(type="INTEGER"),
@@ -104,10 +112,9 @@ TOOLS = [
                         "start_date": types.Schema(type="STRING", description="YYYY-MM-DD"),
                         "end_date": types.Schema(type="STRING", description="YYYY-MM-DD"),
                     },
-                    required=["user_id"],
+                    required=["db_file", "user_id"],
                 ),
             ),
         ]
     )
 ]
-

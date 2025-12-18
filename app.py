@@ -16,7 +16,7 @@ from services.analytics_service import AnalyticsService
 from services.ai_service import AIService
 from utils.tracing import init_tracing
 from ai.tool_impl import TOOL_IMPL
-from ai.native_tool_loop import run_native_tool_calling
+
 
 
 # Loads environment variables
@@ -389,7 +389,7 @@ with tab_budgets:
                 st.info("AI Recommendation:")
                 st.write(analysis_result.get("recommendation", "No recommendation could be generated."))
         else:
-            st.info("No active budget found.")
+            st.info("No active budget found for this month.")
 
         if st.button("🔄 Refresh Budget Status", key="refresh_budget_tab2"):
             notify_db_updated()
@@ -450,7 +450,7 @@ with tab_analytics:
                     return pd.DataFrame()
 
             # -------------------------
-            # Expense Summary (via native tool)
+            # Expense Summary 
             # -------------------------
             st.subheader("Expense Summary")
             try:
@@ -526,7 +526,7 @@ with tab_analytics:
             st.divider()
 
             # -------------------------
-            # Spending Trend (via native tool)
+            # Spending Trend
             # -------------------------
             st.subheader("Spending Trend")
             try:
@@ -576,11 +576,11 @@ with tab_ai:
                 st.write(user_input)
 
             with st.spinner("AI is thinking ..."):
-                out = run_native_tool_calling(
-                    prompt=user_input,
-                    db_file=DB_FILE,
-                    user_id=USER_ID,
-                    model="gemini-2.0-flash",
+                out = ai_client.run_tool_calling_flow(
+                    user_text=user_input,
+                    db_file= DB_FILE,
+                    user_id= USER_ID,
+                    history = st.session_state.chat_history[:-1],
                 )
 
                 answer = out.get("answer") or "..."
@@ -660,5 +660,5 @@ with tab_users:
 
 # Footer
 st.divider()
-st.caption("Built with using Streamlit and Google Gemini")
+st.caption("Built using Streamlit and Google Gemini")
 

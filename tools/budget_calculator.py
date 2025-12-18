@@ -7,6 +7,15 @@ def budget_calculator(db_file: str, user_id: int, start_date: str, end_date: str
     """
     TOOL: budget_calculator
     Calculates spent per category for an active budget period and compares with budgets table.
+
+    Args:
+        db_file (str): The database file path.
+        user_id (int): The ID of the user.
+        start_date (str): The start date of the budget period (YYYY-MM-DD).
+        end_date (str): The end date of the budget period (YYYY-MM-DD). 
+    
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries with category, amount_limit, and spent.
     """
     sql = """
     SELECT 

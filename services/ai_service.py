@@ -22,6 +22,8 @@ try:
     from langfuse import observe
 except Exception:
     from utils.observability import observe
+
+
 from ai.tools_native import TOOLS  # (types.Tool with function_declarations)
 from ai.tool_impl import TOOL_IMPL  # dict: tool_name -> python function
 from ai.native_tool_loop import run_native_tool_calling
@@ -111,48 +113,34 @@ class AIService:
     # BASIC CHAT (no tools)
     # --------------------------------------------------
     @observe()
-    def ai_assistant(
-        self,
-        user_question: str,
-        db_file: str,
-        user_id: int,
-        context_data: Optional[Dict] = None,
-    ) -> str:
+    def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
         if not self.client:
             return "AI assistant unavailable. Please check the API credentials."
 
         context_str = json.dumps(context_data or {}, ensure_ascii=False)
 
-        # se já tens isto:
-        # system_instruction = self.prompts.format("ai_assistant_system")
-        # senão, usa um default:
-        system_instruction = (
-            "You are UniMate, a personal finance assistant. "
-            "Use tools when needed. Be concise. Do not invent numbers."
-        )
+        system_instruction = self.prompts.format("ai_assistant_system")
 
-        prompt = (
+        user_prompt = (
             f"User Question: {user_question}\n"
             f"Context Data (optional): {context_str}\n\n"
             "Answer concisely. If you need fresh numbers, call tools."
         )
 
-        out = run_native_tool_calling(
-            prompt=prompt,
-            db_file=db_file,
-            user_id=user_id,
-            model=self.model,
-            client=self.client,                 # reutiliza o client
-            system_instruction=system_instruction,
+        response = self.client.models.generate_content(
+            model = self.model,
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                system_instruction=system_instruction,
+            ),
         )
-        return out.get("answer", "") or ""
+        return response.text or ""
 
     # --------------------------------------------------
     # NATIVE TOOL CALLING (Gemini function calling)
     # --------------------------------------------------
-        # --------------------------------------------------
-    # NATIVE TOOL CALLING (Gemini function calling) + CHAT MEMORY
-    # --------------------------------------------------
+
     @observe()
     def run_tool_calling_flow(
         self,
@@ -446,7 +434,7 @@ class AIService:
         else:
             context = str(context)
 
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
             try:
                 from openai import OpenAI  # type: ignore
@@ -471,7 +459,7 @@ class AIService:
                 pass
 
         lines = []
-        lines.append("Here’s a quick budget check based on what I can infer from your data:")
+        lines.append("Here's a quick budget check based on what I can infer from your data:")
 
         overspent = []
         for m in re.finditer(

@@ -7,6 +7,13 @@ def get_expense(db_file: str, expense_id: int) -> Optional[Dict[str, Any]]:
     """
     TOOL: get_expense
     Fetch one expense by id.
+
+    Args:
+        db_file (str): The database file path.
+        expense_id (int): The ID of the expense to fetch.   
+    
+    Returns:
+        Optional[Dict[str, Any]]: A dictionary representing the expense if found, otherwise None
     """
     sql = "SELECT * FROM expenses WHERE id = ?"
 

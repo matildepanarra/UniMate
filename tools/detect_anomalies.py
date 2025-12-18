@@ -9,6 +9,13 @@ def detect_anomalies(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: detect_anomalies
     Identifica despesas significativamente maiores que a média (2x).
+
+    Args:
+        db_file (str): O caminho do ficheiro de base de dados.
+        user_id (int): O ID do utilizador.  
+
+    Returns:
+        List[Dict]: Uma lista de dicionários representando despesas anómalas.
     """
     sql = """
     SELECT

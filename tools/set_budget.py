@@ -18,8 +18,15 @@ def set_budget(
     TOOL: set_budget. Atualiza ou insere (upsert) um orçamento.
 
     Args:
-        start_date (YYYY-MM-DD)
-        end_date   (YYYY-MM-DD)
+        db_file (str): O caminho do ficheiro de base de dados.
+        user_id (int): O ID do utilizador.
+        category (str): A categoria do orçamento.
+        amount_limit (float): O limite do orçamento.
+        start_date (str): A data de início do orçamento (YYYY-MM-DD).
+        end_date (str): A data de fim do orçamento (YYYY-MM-DD).
+    
+    Returns:
+        Optional[int]: O ID do orçamento atualizado/inserido, ou None em caso de erro.  
     """
     created_at = datetime.now().isoformat()
 
