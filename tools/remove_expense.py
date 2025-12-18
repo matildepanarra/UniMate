@@ -5,7 +5,9 @@ Deletes an expense from the expenses table.
 
 import sqlite3
 from typing import Dict
+from langfuse import observe 
 
+@observe()
 def remove_expense(db_file: str, user_id: int, expense_id: int) -> Dict:
     conn = sqlite3.connect(db_file)
     conn.row_factory = sqlite3.Row

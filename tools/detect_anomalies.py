@@ -3,8 +3,9 @@ tools/analytics/detect_anomalies.py - Identifica gastos anómalos.
 """
 from typing import Dict, List
 from services import db_connector
+from langfuse import observe 
 
-
+@observe()
 def detect_anomalies(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: detect_anomalies

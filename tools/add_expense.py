@@ -3,7 +3,9 @@
 import sqlite3
 from typing import Optional
 from services import db_connector
+from langfuse import observe 
 
+@observe()
 def add_expense(
     db_file: str,
     user_id: int,

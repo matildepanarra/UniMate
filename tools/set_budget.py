@@ -5,7 +5,9 @@ import sqlite3
 from services import db_connector
 from typing import Optional
 from datetime import datetime
+from langfuse import observe 
 
+@observe()
 def set_budget(
     db_file: str,
     user_id: int,

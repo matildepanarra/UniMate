@@ -1,7 +1,9 @@
 # tools/list_expenses.py
 from typing import List, Dict, Optional
 import sqlite3
+from langfuse import observe 
 
+@observe()
 def list_expenses(
     db_file: str,
     user_id: int,

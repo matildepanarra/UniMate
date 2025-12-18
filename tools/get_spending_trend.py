@@ -3,8 +3,9 @@ tools/analytics/get_spending_trend.py - Calcula o gasto agregado mensal.
 """
 from typing import Dict, List
 from services import db_connector
+from langfuse import observe 
 
-
+@observe()
 def get_spending_trend(db_file: str, user_id: int) -> List[Dict]:
     """
     TOOL: get_spending_trends

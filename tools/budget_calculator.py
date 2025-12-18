@@ -2,7 +2,9 @@
 import sqlite3
 from services import db_connector
 from typing import List, Dict, Any
+from langfuse import observe 
 
+@observe()
 def budget_calculator(db_file: str, user_id: int, start_date: str, end_date: str) -> List[Dict[str, Any]]:
     """
     TOOL: budget_calculator

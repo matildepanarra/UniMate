@@ -4,7 +4,9 @@ tools/analytics/summarize_expense.py - Fornece resumo estatístico.
 import sqlite3
 from typing import Dict
 import services.db_connector as db_connector
+from langfuse import observe 
 
+@observe()
 def summarize_expense(db_file: str, user_id: int) -> Dict:
     """
     TOOL: summarize_expense

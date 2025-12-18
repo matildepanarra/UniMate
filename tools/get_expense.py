@@ -2,7 +2,9 @@
 import sqlite3
 from typing import Optional, Dict, Any
 from services import db_connector
+from langfuse import observe 
 
+@observe()
 def get_expense(db_file: str, expense_id: int) -> Optional[Dict[str, Any]]:
     """
     TOOL: get_expense
