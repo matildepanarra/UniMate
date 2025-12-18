@@ -15,9 +15,9 @@ from services.budget_service import BudgetService
 from services.analytics_service import AnalyticsService
 from services.ai_service import AIService
 from utils.tracing import init_tracing
-
-# ✅ Native tool execution (no router, no JSON schemas in Streamlit)
 from ai.tool_impl import TOOL_IMPL
+from ai.native_tool_loop import run_native_tool_calling
+
 
 # Loads environment variables
 load_dotenv()
@@ -32,13 +32,13 @@ if "user_id" not in st.session_state:
 if "user_info" not in st.session_state:
     st.session_state.user_info = None
 
-# ✅ flags to show success AFTER rerun
+# flags to show success AFTER rerun
 if "expense_saved_flag" not in st.session_state:
     st.session_state.expense_saved_flag = False
 if "last_saved_expense" not in st.session_state:
     st.session_state.last_saved_expense = None
 
-# ✅ used to force UI refresh across tabs when DB changes
+# used to force UI refresh across tabs when DB changes
 if "_last_db_update" not in st.session_state:
     st.session_state["_last_db_update"] = "0"
 
@@ -81,7 +81,7 @@ if "services_ready" not in st.session_state:
     try:
         db_connector.initialize_database()
 
-        # ✅ keep services for the parts of the app that still depend on them
+        # keep services for the parts of the app that still depend on them
         st.session_state.expense_service = ExpenseService(db_file=DB_FILE)
         st.session_state.budget_service = BudgetService(db_file=DB_FILE)
         st.session_state.analytics_service = AnalyticsService(db_file=DB_FILE)
@@ -107,7 +107,7 @@ This app demonstrates:
 - Expense Tracking
 - Budget Management
 - Financial Analytics
-- AI-Chat Assistant (Native Tool Calling)
+- AI-Chat Assistant
 """
     )
     st.divider()
@@ -155,7 +155,7 @@ with tab_expenses:
     if USER_ID is None:
         st.info("Please login in the Profile tab to continue.")
     else:
-        # ✅ show success AFTER rerun
+        # show success AFTER rerun
         if st.session_state.get("expense_saved_flag"):
             st.success("Expense saved successfully!")
             last = st.session_state.get("last_saved_expense")
@@ -287,7 +287,6 @@ with tab_expenses:
         expense_service = st.session_state.expense_service
         st.subheader("All Expenses")
 
-        # filtros simples
         c1, c2, c3, c4 = st.columns(4)
         f_category = c1.selectbox("Filter by category", ["(all)"] + expense_service.valid_categories, key="all_exp_cat")
         f_limit = c2.number_input("Rows to show", min_value=20, max_value=2000, value=200, step=20, key="all_exp_limit")
@@ -314,7 +313,6 @@ with tab_expenses:
                 st.info("No expenses found for the selected filters.")
         except Exception as e:
             st.error(f"Could not load expenses: {e}")
-
 
 # ----------------------------------------
 # TAB BUDGETS
@@ -578,12 +576,13 @@ with tab_ai:
                 st.write(user_input)
 
             with st.spinner("AI is thinking ..."):
-                out = ai_client.run_tool_calling_flow(
-                    user_text=user_input,
+                out = run_native_tool_calling(
+                    prompt=user_input,
                     db_file=DB_FILE,
                     user_id=USER_ID,
-                    history=st.session_state.chat_history[:-1],  
+                    model="gemini-2.0-flash",
                 )
+
                 answer = out.get("answer") or "..."
 
                 if out.get("db_updated"):
