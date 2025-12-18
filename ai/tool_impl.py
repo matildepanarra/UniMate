@@ -1,4 +1,3 @@
-# ai/tool_impl.py
 from tools.add_expense import add_expense
 from tools.get_expense import get_expense
 from tools.set_budget import set_budget
