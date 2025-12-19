@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 
 from services.ai_service import AIService
 
-
 class TestAIService(unittest.TestCase):
 
     @patch("services.ai_service.genai.Client", side_effect=Exception("No API key"))
