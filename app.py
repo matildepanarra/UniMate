@@ -42,7 +42,7 @@ if "last_saved_expense" not in st.session_state:
 if "_last_db_update" not in st.session_state:
     st.session_state["_last_db_update"] = "0"
 
-# --- INITIALIZE TRACING/OBSERVABILITY ---
+# --- INITIALIZE TRACING ---
 init_tracing()
 
 # Configure page
