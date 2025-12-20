@@ -1,4 +1,6 @@
-# tools/expense/get_expense.py
+"""
+Tool to fetch an expense record by its ID from the database.
+"""
 import sqlite3
 from typing import Optional, Dict, Any
 from services import db_connector

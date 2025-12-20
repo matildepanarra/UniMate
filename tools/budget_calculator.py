@@ -1,4 +1,6 @@
-# tools/budget/budget_calculator.py
+"""
+Tool to calculate budget status for a user.
+"""
 import sqlite3
 from services import db_connector
 from typing import List, Dict, Any

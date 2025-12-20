@@ -1,4 +1,6 @@
-# tools/list_expenses.py
+"""
+Tool to list expenses with optional filters.
+"""
 from typing import List, Dict, Optional
 import sqlite3
 from langfuse import observe 

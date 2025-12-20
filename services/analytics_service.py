@@ -1,5 +1,7 @@
 """
-analytics_service.py - Gives reports and insights of aggregated data using SQLite.
+Analytics service - detecting anomalies and generating spending trends.
+Provides methods to analyze user expenses and return insights.
+
 """
 
 from typing import Dict, List

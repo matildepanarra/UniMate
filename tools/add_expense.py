@@ -1,5 +1,6 @@
-# Lógica Pura: SÓ se preocupa com o BANCO DE DADOS
-# tools/expense/add_expense.py
+"""
+Tool to add a new expense record to the database.
+"""
 import sqlite3
 from typing import Optional
 from services import db_connector

@@ -1,5 +1,5 @@
 """
-budget_service.py - Manages budgets, limits and status for the user.
+Budget Service - Manages budgets, limits and status for the user.
 
 This service ORCHESTRATES the TOOLS:
 - set_budget (DB persistence)
@@ -26,9 +26,8 @@ class BudgetService:
         self.db_file = db_file
         self.ai_client = AIService()
 
-    # -------------------------
+
     # Helpers
-    # -------------------------
     @observe()
     def _get_current_month_dates(self) -> Tuple[str, str]:
         """Returns first day of current month and first day of next month (YYYY-MM-DD)."""
@@ -41,9 +40,8 @@ class BudgetService:
             end_date = datetime(now.year, now.month + 1, 1).strftime("%Y-%m-%d")
         return start_date, end_date
 
-    # ----------------------------------------------------
+
     # SERVICE: set_budget (Orchestrates DB Tool)
-    # ----------------------------------------------------
     @observe()
     def set_budget(self, user_id: int, category: str, amount_limit: float) -> Optional[int]:
         """Defines/updates a budget using the set_budget tool."""
@@ -63,9 +61,8 @@ class BudgetService:
             print(f"Error setting budget (delegated to tool): {e}")
             return None
 
-    # ----------------------------------------------------
-    # SERVICE: get_budget_status (Orchestrates DB Tool + Business Rules)
-    # ----------------------------------------------------
+
+    # SERVICE: get_budget_status 
     @observe()
     def get_budget_status(self, user_id: int) -> List[Dict]:
         """
@@ -112,9 +109,8 @@ class BudgetService:
 
         return status_report
 
-    # ----------------------------------------------------
-    # SERVICE: analyze_budget (Orchestrates Tools + AI)
-    # ----------------------------------------------------
+
+    # SERVICE: analyze_budget 
     @observe()
     def analyze_budget(self, user_id: int) -> Dict:
         """
@@ -124,7 +120,7 @@ class BudgetService:
         - composes context using get_budget_status
         - generates advice
         """
-        # 1) Fetch recent expenses (kept as direct SQL, like your original version)
+        #Fetch recent expenses (kept as direct SQL, like your original version)
         conn = None
         historical_data = []
 
@@ -157,13 +153,13 @@ class BudgetService:
         if not historical_data:
             return {"advice": "Dados insuficientes para análise de orçamento."}
 
-        # 2) AI prediction
+        #AI prediction
         prediction_result = self.ai_client.predict_future_spending(
             historical_data=json.dumps(historical_data),
             prediction_period="o próximo mês",
         )
 
-        # 3) Current budget status (tool + business rules)
+        #Current budget status (tool + business rules)
         status = self.get_budget_status(user_id)
 
         full_analysis_context = {
@@ -172,7 +168,7 @@ class BudgetService:
             "recent_spending": historical_data[:10],
         }
 
-        # 4) AI advice
+        #AI advice
         recommendation_text = self.ai_client.generate_financial_advice(full_analysis_context)
 
         return {

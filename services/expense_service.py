@@ -11,7 +11,6 @@ from langfuse import observe
 from services import db_connector
 from services.ai_service import AIService
 
-# Tool
 from tools.add_expense import add_expense
 from tools.get_expense import get_expense
 from tools.summarize_expense import summarize_expense
@@ -23,9 +22,8 @@ class ExpenseService:
         self.ai_client = AIService()
         self.valid_categories = ["Grocery", "Transport", "Restaurant", "Leisure", "Home", "Others", "Party", "University","Health"]
 
-    # -------------------------
+
     # TOOL WRAPPERS
-    # -------------------------
     @observe()
     def add_expense(self, user_id: int, amount: float, description: str, date_str: str, category: str) -> Optional[int]:
         if amount <= 0:
@@ -40,7 +38,7 @@ class ExpenseService:
             transaction_date=date_str,         # ✅ date_str -> transaction_date
         )
 
-    # CÓDIGO CORRIGIDO/SIMPLIFICADO:
+
     @observe()
     def get_expense(self, expense_id: int) -> Optional[Dict]:
         # Se a Toolget_expense SEMPRE precisar de db_file, simplesmente passe-o.
@@ -53,9 +51,8 @@ class ExpenseService:
         return summarize_expense(db_file=self.db_file, user_id=user_id) \
             if "db_file" in summarize_expense.__code__.co_varnames else summarize_expense(user_id)
 
-    # -------------------------
+
     # AI ORCHESTRATION
-    # -------------------------
     @observe()
     def add_expense_from_document(self, user_id: int, document_text: str) -> Optional[int]:
         extracted = self.ai_client.extract_document_data(document_text)

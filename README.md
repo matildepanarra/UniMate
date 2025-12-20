@@ -9,10 +9,10 @@ UniMate is a comprehensive financial management application designed specificall
 
 ## Features
 
-- Key feature 1
-- Key feature 2
-- Key feature 3
-- What makes your application unique 
+- Expense Tracking
+- Budget Management
+- Financial Analytics
+- AI-Chat Assistant
 
 ## Tech Stack
 
@@ -35,57 +35,49 @@ UniMate is a comprehensive financial management application designed specificall
 
 UniMate follows a clean architecture pattern with clear separation of concerns across four main layers:
 ```
-unimate/
-├── ui/                      # Frontend Layer (Streamlit)
-│   ├── pages/              # Application pages
-│   │   ├── expense_tracker.py
-│   │   ├── budget_manager.py
-│   │   ├── analytics.py
-│   │   ├── ai_assistant.py
-│   │   └── goals.py
-│   ├── components/         # Reusable UI components
-│   └── app.py             # Main application entry point
+UNIMATE/
+├── ai/                         # Tool callling auxiliar 
+│   ├── tools_router.py         # Tool calling logic 
+│   └── tools_schema.py         # Tool calling shcema 
 │
-├── services/               # Business Logic Layer
-│   ├── expense_service.py  # Expense CRUD and logic
-│   ├── budget_service.py   # Budget management
-│   ├── analytics_service.py # Pattern detection and insights
-│   └── goal_service.py     # Savings goal tracking
+├── services/                   # Business logic layer
+│   ├── ai_service.py           # Gestão da comunicação com LLMs
+│   ├── analytics_service.py    # Processamento de insights e padrões
+│   ├── budget_service.py       # Regras de gestão de orçamentos
+│   ├── db_connector.py         # Ligação central à base de dados
+│   └── expense_service.py      # Lógica de gestão de despesas
 │
-├── ai/                     # AI Integration Layer
-│   ├── assistant.py        # AI assistant controller
-│   ├── prompts.py          # Prompt templates and engineering
-│   ├── tools.py            # Function calling tool definitions
-│   └── tool_router.py      # Tool routing and execution logic
+├── tools/                      # Function calling tools
+│   ├── add_expense.py          # Registo de novas despesas
+│   ├── budget_calculator.py    # Cálculos de limites e poupança
+│   ├── detect_anomalies.py     # Identificação de gastos fora do comum
+│   ├── get_spending_trend.py   # Análise de tendências temporais
+│   └── get expense.py          #
+│   └── get_spending_trend
+│   └── list_expenses.py
+│   └── remove_expense.py
+│   └── set_budget.py
+│   └── summarize_expense.py
 │
-├── models/                 # Data Models
-│   ├── expense.py
-│   ├── budget.py
-│   ├── user.py
-│   └── goal.py
+├── utils/                      #Utility functions
+│   └── tracing.py              #Langfuse configuration
 │
-├── data/                   # Data Access Layer
-│   ├── database.py         # Database operations
-│   └── storage/            # File storage for receipts
+|
+├── docs/                       # ARCHITECTURE.md
+├── tests/                      # Tests 
+├── unimate_env/                # Virtual environment 
 │
-├── utils/                  # Utility Functions
-│   ├── validators.py       # Data validation
-│   ├── formatters.py       # Data formatting
-│   └── constants.py        # Application constants
-│
-├── docs/                   # Documentation
-│   ├── ARCHITECTURE.md     # Detailed architecture decisions
-│   └── diagrams/           # Architecture and data flow diagrams
-│
-├── requirements.txt        # Python dependencies
-├── .env.example           # Environment variable template
-└── README.md              # This file
+├── app.py                      # Main application entry point (Streamlit UI)
+├── unimate_financial_data.db   # Local Database SQLite3
+├── requirements.txt            # Dependencies
+└── .env.example                # Environment variable template
+
 
 ## Installation & Setup
 
 ### Prerequisites
 - Python 3.x
-- API keys for [required services]
+- API keys
 
 ### Installation Steps
 
@@ -125,7 +117,7 @@ uv run streamlit run app.py
 ### Tracking Expenses
 
 **Method 1: Manual Entry**
-1. Navigate to the "Track Expense" page
+1. Navigate to the "Expenses" page
 2. Fill in: amount, category, date, and description
 3. Click "Add Expense"
 
@@ -136,20 +128,27 @@ Simply tell the assistant in natural language:
 - *"I bought textbooks for €150"*
 
 **Method 3: Receipt Upload**
-1. Go to "Upload Receipt" page
-2. Take a photo or upload an image of your receipt
-3. Review the automatically extracted information
-4. Confirm or edit details as needed
+1. Go to "Expenses" page
+2. Upload an image of your receipt
 
-### Managing Budgets
+### Setting new Budgets
 
-1. Navigate to "Budget Management"
-2. Choose a template:
-   - **On-Campus Student**: Living in dorms with meal plan
-   - **Off-Campus Student**: Independent living expenses
-   - **International Student**: Additional costs like travel and insurance
-3. Customize category allocations based on your needs
-4. Save and monitor progress throughout the month
+1. Go to "Budget" page
+2. Select category and enter value
+3. Click "Add new budget"
+4. Track progress and receive AI-powered recommendations
+
+### Viewing Analytics
+
+Navigate to the "Analytics" page to see:
+- Spending breakdown by category
+- Spending trends over time
+- Total transactions
+- Top spending categories
+- Unusual transactions and patterns
+- Anomalies detection
+
+
 
 ### Using the AI Assistant
 
@@ -157,49 +156,27 @@ The AI assistant can help with various financial queries:
 
 **Budget Questions:**
 - *"How much have I spent on food this month?"*
-- *"Am I staying within my entertainment budget?"*
-- *"What percentage of my budget have I used?"*
+- *"Am I staying within my party budget this month?"*
 
 **Financial Advice:**
 - *"Give me tips to save more money"*
-- *"Should I increase my entertainment budget?"*
 - *"How can I reduce my spending on transport?"*
 
 **Goal Planning:**
 - *"Help me plan for a €500 emergency fund"*
 - *"When can I afford a €1000 laptop?"*
-- *"What's the best way to save for spring break?"*
+- *"What's the best way to save for vacation?"*
 
 **Analytics & Insights:**
-- *"Show me my spending trends"*
+- *"Tell me about my spending trends"*
 - *"What am I spending too much on?"*
-- *"How does this month compare to last month?"*
 
-### Viewing Analytics
-
-Navigate to the "Analytics" page to see:
-- Spending breakdown by category (pie chart)
-- Spending trends over time (line graph)
-- Budget vs. actual comparison (bar chart)
-- Top spending categories
-- Unusual transactions and patterns
-- Personalized recommendations
-
-### Setting Savings Goals
-
-1. Go to "Savings Goals" page
-2. Click "Create New Goal"
-3. Enter: goal name, target amount, and deadline
-4. Track progress and receive AI-powered recommendations
-5. Adjust your budget based on goal requirements
-
-*Add screenshots or GIFs here to visually demonstrate your application's key features*
 
 ## Deployment
 
 **Live Application:** [Your deployed URL]
 
-**Deployment Platform:** [Streamlit Cloud / Render / Vercel / etc.]
+**Deployment Platform:** Streamlit Cloud
 
 ### Deploying Your Own Instance
 

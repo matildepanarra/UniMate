@@ -6,7 +6,7 @@ Responsibilities:
 - Expose AI capabilities as high-level methods
 - Handle document ingestion (image / PDF)
 - Classify expenses
-- Native tool-calling orchestration using local Python tools (SQLite)
+- tool-calling orchestration
 """
 
 import os
@@ -25,9 +25,7 @@ from ai.tools_schema import TOOLS
 from ai.tools_router import TOOL_IMPL  
 
 
-# --------------------------------------------------
-# Schemas
-# --------------------------------------------------
+#Schemas
 class TransactionExtract(BaseModel):
     amount: float = Field(description="Transaction amount")
     description: str = Field(description="Merchant or transaction summary")
@@ -46,9 +44,8 @@ class DocumentIngestionResult(BaseModel):
     transactions: List[TransactionExtract] = Field(default_factory=list)
 
 
-# --------------------------------------------------
-# Prompt Loader
-# --------------------------------------------------
+
+#Prompt Loader
 class PromptLoader:
     def format(self, name: str, **kwargs) -> str:
         if name == "ai_assistant_system":
@@ -85,9 +82,7 @@ class PromptLoader:
         return ""
 
 
-# --------------------------------------------------
-# AI Service
-# --------------------------------------------------
+#AI Service
 class AIService:
     def __init__(self, model: str = "gemini-2.5-flash"):
         self.model = model
@@ -105,11 +100,7 @@ class AIService:
             print(f"Failed to initialize Gemini client: {e}")
             self.client = None
 
-    # --------------------------------------------------
-    # AI Assistant
-    # --------------------------------------------------
-        # BASIC CHAT (no tools)
-    # --------------------------------------------------
+#AI Assistant
     @observe()
     def ai_assistant(self, user_question: str, context_data: Optional[Dict] = None) -> str:
         if not self.client:
@@ -135,9 +126,7 @@ class AIService:
         )
         return response.text or ""
 
-    # --------------------------------------------------
-    # NATIVE TOOL CALLING (Gemini function calling)
-    # --------------------------------------------------
+#AI Chat with Tool Calling
     @observe()
     def ai_chat(
         self,
@@ -280,9 +269,7 @@ class AIService:
             # loop continues until model returns final text
 
 
-    # --------------------------------------------------
-    # DOCUMENT INGESTION (PDF / IMAGE)
-    # --------------------------------------------------
+#Document ingestion
     @observe()
     def ingest_document(self, file_bytes: bytes, mime_type: str, date_hint: Optional[str] = None) -> Dict:
         if not self.client:
@@ -334,9 +321,7 @@ class AIService:
             "transactions": transactions,
         }
 
-    # --------------------------------------------------
-    # FUTURE SPENDING PREDICTION
-    # --------------------------------------------------
+#predictions
     @observe()
     def predict_future_spending(self, historical_data: str, prediction_period: str = "next month") -> Dict:
         if not self.client:
@@ -368,9 +353,7 @@ class AIService:
             "justification": str(data.get("justification", "") or ""),
         }
 
-    # --------------------------------------------------
-    # CLASSIFY EXPENSE
-    # --------------------------------------------------
+#classify expense
     @observe()
     def classify_expense(self, amount: float, description: str, categories_list: List[str]) -> str:
         if not self.client:
@@ -403,9 +386,7 @@ class AIService:
         result = (response.text or "").strip().split("\n")[0].strip()
         return result if result in categories_list else "Others"
 
-    # --------------------------------------------------
-    # COMPAT: extract_document_data (para ExpenseService.add_expense_from_document)
-    # --------------------------------------------------
+#COMPAT: extract_document_data (para ExpenseService.add_expense_from_document)
     @observe()
     def extract_document_data(self, document_text: str) -> dict:
         instruction = (
@@ -422,9 +403,7 @@ class AIService:
         except Exception:
             return {"amount": 0.0, "description": "", "date": "", "category": ""}
 
-    # --------------------------------------------------
-    # Advice (OpenAI optional fallback kept)
-    # --------------------------------------------------
+#generate financial advice
     @observe()
     def generate_financial_advice(self, context_data: Any) -> str:
         if not self.client:
