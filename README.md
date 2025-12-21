@@ -174,7 +174,7 @@ The AI assistant can help with various financial queries:
 
 ## Deployment
 
-**Live Application:** [Your deployed URL]
+**Live Application:** (https://unimate.streamlit.app)]
 
 **Deployment Platform:** Streamlit Cloud
 
