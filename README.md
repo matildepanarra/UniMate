@@ -84,7 +84,7 @@ UNIMATE/
 1. Clone the repository:
 ```bash
 git clone [your-repo-url]
-cd [project-name]
+cd UniMate
 ```
 
 2. Install dependencies:
@@ -95,7 +95,7 @@ uv sync
 3. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your keys
 ```
 
 **Required environment variables:**
@@ -149,7 +149,6 @@ Navigate to the "Analytics" page to see:
 - Anomalies detection
 
 
-
 ### Using the AI Assistant
 
 The AI assistant can help with various financial queries:
@@ -174,7 +173,7 @@ The AI assistant can help with various financial queries:
 
 ## Deployment
 
-**Live Application:** (https://unimate.streamlit.app)]
+**Live Application:** (https://unimate.streamlit.app)
 
 **Deployment Platform:** Streamlit Cloud
 
@@ -187,13 +186,6 @@ The AI assistant can help with various financial queries:
 4. Configure secrets in the Streamlit dashboard:
    - Add all environment variables from `.env`
 5. Click "Deploy"
-
-**Other Platforms:**
-Ensure your deployment platform supports:
-- Python 3.11+
-- Environment variable configuration
-- File upload capabilities (for receipt processing)
-
 
 
 ## Project Structure
