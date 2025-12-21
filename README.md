@@ -90,7 +90,7 @@ cd UniMate
 
 2. Install dependencies:
 ```bash
-uv sync
+pip install -r requirements.txt
 ```
 
 3. Set up environment variables:
