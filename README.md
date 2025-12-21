@@ -1,4 +1,4 @@
-# UniMate: AI-powered Financial Assistant for Students 
+# UniMate: AI-powered Financial Assistant
 
 AI-driven assistant that helps students quickly find and apply for financial aid by analyzing their information and documents.
 
@@ -71,6 +71,7 @@ UNIMATE/
 ├── unimate_financial_data.db   # Local Database SQLite3
 ├── pyproject.toml              # Dependencies
 └── .env.example                # Environment variable template
+
 
 
 ## Installation & Setup
