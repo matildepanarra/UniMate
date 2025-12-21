@@ -48,16 +48,15 @@ UNIMATE/
 │   └── expense_service.py      # Lógica de gestão de despesas
 │
 ├── tools/                      # Function calling tools
-│   ├── add_expense.py          # Registo de novas despesas
-│   ├── budget_calculator.py    # Cálculos de limites e poupança
-│   ├── detect_anomalies.py     # Identificação de gastos fora do comum
-│   ├── get_spending_trend.py   # Análise de tendências temporais
-│   └── get expense.py          #
-│   └── get_spending_trend
-│   └── list_expenses.py
-│   └── remove_expense.py
-│   └── set_budget.py
-│   └── summarize_expense.py
+│   ├── add_expense.py          # New expenses addition
+│   ├── budget_calculator.py    # budget related calculations
+│   ├── detect_anomalies.py     # Identify expenses that might be anomalies 
+│   ├── get_spending_trend.py   # Analytics on spending trends
+│   └── get expense.py          # get the expense
+│   └── list_expenses.py        # list all the expenses registered 
+│   └── remove_expense.py       # delete any expense 
+│   └── set_budget.py           # set a new budget by category
+│   └── summarize_expense.py    # summary of expense
 │
 ├── utils/                      #Utility functions
 │   └── tracing.py              #Langfuse configuration
@@ -69,7 +68,7 @@ UNIMATE/
 │
 ├── app.py                      # Main application entry point (Streamlit UI)
 ├── unimate_financial_data.db   # Local Database SQLite3
-├── pyproject.toml              # Dependencies
+├── requirements.txt            # Dependencies
 └── .env.example                # Environment variable template
 
 
