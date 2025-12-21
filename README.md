@@ -69,7 +69,7 @@ UNIMATE/
 │
 ├── app.py                      # Main application entry point (Streamlit UI)
 ├── unimate_financial_data.db   # Local Database SQLite3
-├── requirements.txt            # Dependencies
+├── pyproject.toml              # Dependencies
 └── .env.example                # Environment variable template
 
 
