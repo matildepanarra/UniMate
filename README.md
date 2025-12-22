@@ -31,7 +31,7 @@ UniMate is a comprehensive financial management application designed specificall
 - Prompt engineering for personalized financial advice 
 
 ## Architecture
-
+````
 
 UniMate follows a clean architecture pattern with clear separation of concerns across four main layers:
 ```
@@ -70,7 +70,7 @@ UNIMATE/
 ├── unimate_financial_data.db   # Local Database SQLite3
 ├── requirements.txt            # Dependencies
 └── .env.example                # Environment variable template
-
+````
 
 
 ## Installation & Setup
